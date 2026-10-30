@@ -82,6 +82,15 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
   </ItemGroup>
 
+  <!-- The test project drives the internal parsing layer
+       (Services/Parsing/*, FlashProgressTracker) directly. Those types are
+       deliberately internal: they are an implementation detail of the services,
+       and keeping them out of the public surface means restructuring them later
+       is not a breaking change. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="SailTool.Tests" />
+  </ItemGroup>
+
   <PropertyGroup Condition="'$(DisableHasPackageAndPublishMenuAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
     <HasPackageAndPublishMenu>true</HasPackageAndPublishMenu>
   </PropertyGroup>
