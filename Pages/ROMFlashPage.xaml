@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="FastTool.Pages.ROMFlashPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="20" Margin="0,0,24,32">
+
+            <!-- 页面标题 -->
+            <StackPanel Spacing="4">
+                <TextBlock Text="小米线刷"
+                           Style="{StaticResource TitleTextBlockStyle}" FontSize="20" />
+                <TextBlock Text="选择线刷包文件夹，自动识别刷机脚本，一键执行线刷"
+                           Style="{StaticResource BodyTextBlockStyle}"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+
+            <!-- 线刷配置卡片 -->
+            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    CornerRadius="8" Padding="24">
+                <StackPanel Spacing="16">
+
+                    <!-- 文件夹路径显示框 -->
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="线刷包文件夹" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                        <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Padding="12,8">
+                            <TextBlock x:Name="FolderPathLabel"
+                                       Text="{x:Bind ViewModel.FolderDisplayText, Mode=OneWay}"
+                                       FontFamily="Cascadia Code"
+                                       FontSize="12"
+                                       TextTrimming="CharacterEllipsis"
+                                       IsTextSelectionEnabled="True"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </Border>
+                    </StackPanel>
+
+                    <!-- 刷机脚本模式选择（三选一） -->
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="刷写模式" Style="{StaticResource BodyStrongTextBlockStyle}" />
+
+                        <RadioButton x:Name="RadioFlashAll"
+                                     GroupName="FlashMode"
+                                     IsChecked="True"
+                                     IsEnabled="{x:Bind ViewModel.HasFlashAll, Mode=OneWay}"
+                                     Checked="RadioFlashAll_Checked">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="flash_all.bat — 全盘刷写并清空数据" />
+                                <TextBlock Text="刷写所有分区并抹除用户数据，恢复到出厂状态"
+                                           FontSize="12"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                        </RadioButton>
+
+                        <RadioButton x:Name="RadioFlashExceptStorage"
+                                     GroupName="FlashMode"
+                                     IsEnabled="{x:Bind ViewModel.HasFlashExceptStorage, Mode=OneWay}"
+                                     Checked="RadioFlashExceptStorage_Checked">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="flash_all_except_storage.bat — 刷写除存储外的分区" />
+                                <TextBlock Text="刷写系统分区但保留用户数据和应用"
+                                           FontSize="12"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                        </RadioButton>
+
+                        <RadioButton x:Name="RadioFlashLock"
+                                     GroupName="FlashMode"
+                                     IsEnabled="{x:Bind ViewModel.HasFlashLock, Mode=OneWay}"
+                                     Checked="RadioFlashLock_Checked">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="flash_all_lock.bat — 全盘刷写并重新上锁" />
+                                <TextBlock Text="刷写所有分区并重新锁定 Bootloader"
+                                           FontSize="12"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                        </RadioButton>
+
+                        <TextBlock x:Name="BatHintText"
+                                   Text="选择文件夹后自动识别可用脚本"
+                                   FontSize="12"
+                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                    </StackPanel>
+
+                    <!-- 操作按钮 -->
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button x:Name="BrowseFolderBtn"
+                                Content="选择文件夹"
+                                Click="BrowseFolder_Click" />
+                        <Button x:Name="StartFlashBtn"
+                                Content="开始刷机"
+                                Click="StartFlash_Click"
+                                Style="{StaticResource AccentButtonStyle}"
+                                IsEnabled="False" />
+                        <Button x:Name="CancelFlashBtn"
+                                Content="取消"
+                                Click="CancelFlash_Click"
+                                IsEnabled="False"
+                                Visibility="Collapsed" />
+                        <ProgressRing x:Name="FlashRing"
+                                      IsActive="False"
+                                      Width="24" Height="24" />
+                        <TextBlock x:Name="StatusLabel"
+                                   Text="就绪"
+                                   VerticalAlignment="Center"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+
+                    <!-- 总进度行：进度条 + 百分比 + 当前分区名 -->
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12"
+                          x:Name="ProgressRow" Visibility="Collapsed">
+                        <TextBlock x:Name="CurrentPartitionLabel"
+                                   Text=""
+                                   FontFamily="Cascadia Code"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"
+                                   MinWidth="120"
+                                   Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTipService.ToolTip="{x:Bind CurrentPartitionLabel.Text, Mode=OneWay}" />
+                        <Grid Grid.Column="1">
+                            <ProgressBar x:Name="RomIndeterminateBar"
+                                         IsIndeterminate="True"
+                                         Background="Transparent"
+                                         Visibility="Collapsed" />
+                            <ProgressBar x:Name="RomExactBar"
+                                         Value="0" Maximum="100"
+                                         Background="Transparent"
+                                         Visibility="Visible" />
+                        </Grid>
+                        <TextBlock x:Name="PercentLabel"
+                                   Grid.Column="2"
+                                   Text="0%"
+                                   FontFamily="Cascadia Code"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"
+                                   MinWidth="56"
+                                   TextAlignment="Right"
+                                   Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                    </Grid>
+
+                </StackPanel>
+            </Border>
+
+            <!-- 日志面板 -->
+            <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    CornerRadius="8" Padding="16">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="线刷日志" Style="{StaticResource SubtitleTextBlockStyle}" FontSize="16" />
+                    <ScrollViewer x:Name="LogScroll"
+                                  Height="280"
+                                  MaxHeight="280">
+                        <TextBlock x:Name="LogTextBlock"
+                                   Text=""
+                                   FontFamily="Cascadia Code"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   IsTextSelectionEnabled="True" />
+                    </ScrollViewer>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

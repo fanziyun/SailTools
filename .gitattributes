@@ -1,0 +1,43 @@
+# Normalize line endings on commit; check out with LF by default.
+# Existing sources are LF (matches .editorconfig end_of_line = lf).
+* text=auto eol=lf
+
+# Source and docs: LF
+*.cs        text eol=lf
+*.xaml      text eol=lf
+*.csproj    text eol=lf
+*.props     text eol=lf
+*.targets   text eol=lf
+*.sln       text eol=crlf
+*.manifest  text eol=lf
+*.appxmanifest text eol=lf
+*.json      text eol=lf
+*.md        text eol=lf
+*.editorconfig text eol=lf
+*.gitattributes text eol=lf
+*.gitignore text eol=lf
+
+# Windows scripts: CRLF (PowerShell and Inno Setup expect it)
+*.ps1       text eol=crlf
+*.iss       text eol=crlf
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+
+# Third-party tool binaries under tools/ — MUST stay binary.
+# A text conversion here would corrupt the PE headers.
+*.exe       binary
+*.dll       binary
+*.so        binary
+*.ico       binary
+*.png       binary
+*.jpg       binary
+*.zip       binary
+*.7z        binary
+*.msix      binary
+*.appx      binary
+
+# platform-tools data files are text but ship byte-exact from upstream;
+# keep them untouched so a version bump is a clean replace.
+tools/**/NOTICE.txt        -text
+tools/**/source.properties -text
+tools/**/mke2fs.conf       -text

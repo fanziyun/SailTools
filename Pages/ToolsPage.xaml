@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="FastTool.Pages.ToolsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="20" Margin="0,0,24,32">
+
+            <!-- Header -->
+            <StackPanel Spacing="4">
+                <TextBlock Text="高级工具"
+                           Style="{StaticResource TitleTextBlockStyle}" FontSize="20" />
+                <TextBlock Text="Fastboot 高级命令集合"
+                           Style="{StaticResource BodyTextBlockStyle}"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+
+            <!-- Tool buttons -->
+            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    CornerRadius="8" Padding="24">
+                <StackPanel Spacing="16">
+                    <TextBlock Text="常用命令" Style="{StaticResource SubtitleTextBlockStyle}" FontSize="16" />
+
+                    <VariableSizedWrapGrid Orientation="Horizontal"
+                                           ItemWidth="200" ItemHeight="80"
+                                           MaximumRowsOrColumns="3">
+
+                        <!-- Reboot -->
+                        <Button Width="180" Height="65" Padding="12"
+                                HorizontalContentAlignment="Left"
+                                Click="Reboot_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon FontFamily="Segoe Fluent Icons"
+                                          Glyph="&#xE7BA;" FontSize="18" />
+                                <StackPanel>
+                                    <TextBlock Text="Reboot"
+                                               Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                    <TextBlock Text="重启设备" FontSize="11"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- Reboot Recovery -->
+                        <Button Width="180" Height="65" Padding="12"
+                                HorizontalContentAlignment="Left"
+                                Click="RebootRecovery_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon FontFamily="Segoe Fluent Icons"
+                                          Glyph="&#xE7BA;" FontSize="18" />
+                                <StackPanel>
+                                    <TextBlock Text="Reboot Recovery"
+                                               Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                    <TextBlock Text="重启到 Recovery" FontSize="11"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- Reboot Bootloader -->
+                        <Button Width="180" Height="65" Padding="12"
+                                HorizontalContentAlignment="Left"
+                                Click="RebootBootloader_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon FontFamily="Segoe Fluent Icons"
+                                          Glyph="&#xE7BA;" FontSize="18" />
+                                <StackPanel>
+                                    <TextBlock Text="Reboot BL"
+                                               Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                    <TextBlock Text="重启到 Bootloader" FontSize="11"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- Unlock OEM -->
+                        <Button Width="180" Height="65" Padding="12"
+                                HorizontalContentAlignment="Left"
+                                Click="Unlock_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon FontFamily="Segoe Fluent Icons"
+                                          Glyph="&#xE7B8;" FontSize="18" />
+                                <StackPanel>
+                                    <TextBlock Text="Unlock OEM"
+                                               Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                    <TextBlock Text="解锁 Bootloader" FontSize="11"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- GetVar -->
+                        <Button Width="180" Height="65" Padding="12"
+                                HorizontalContentAlignment="Left"
+                                Click="GetVar_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon FontFamily="Segoe Fluent Icons"
+                                          Glyph="&#xE8A5;" FontSize="18" />
+                                <StackPanel>
+                                    <TextBlock Text="GetVar all"
+                                               Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                    <TextBlock Text="查看设备变量" FontSize="11"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- 一键宽容 -->
+                        <Button Width="180" Height="65" Padding="12"
+                                HorizontalContentAlignment="Left"
+                                Click="PermissiveMode_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon FontFamily="Segoe Fluent Icons"
+                                          Glyph="&#xE72E;" FontSize="18" />
+                                <StackPanel>
+                                    <TextBlock Text="一键宽容"
+                                               Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                    <TextBlock Text="宽容模式 + 重启" FontSize="11"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Button>
+
+                    </VariableSizedWrapGrid>
+                </StackPanel>
+            </Border>
+
+            <!-- Erase partition card -->
+            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    CornerRadius="8" Padding="24">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="擦除分区"
+                               Style="{StaticResource SubtitleTextBlockStyle}" FontSize="16" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBox x:Name="EraseInput"
+                                 PlaceholderText="分区名 (如 userdata, cache)"
+                                 Text="{x:Bind ViewModel.ErasePartition, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 Width="260" />
+                        <Button Content="执行擦除"
+                                Click="Erase_Click"
+                                Style="{StaticResource AccentButtonStyle}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Custom command card -->
+            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    CornerRadius="8" Padding="24">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="自定义 fastboot 命令"
+                               Style="{StaticResource SubtitleTextBlockStyle}" FontSize="16" />
+                    <TextBlock Text="不需要输入 'fastboot' 前缀，例: oem unlock, continue, devices"
+                               FontSize="12"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBox x:Name="CustomInput"
+                                 PlaceholderText="例: flashing unlock_critical"
+                                 Text="{x:Bind ViewModel.CustomCommand, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 Width="400" />
+                        <Button Content="执行"
+                                Click="CustomCmd_Click" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Status InfoBar -->
+            <InfoBar x:Name="StatusInfoBar"
+                     IsOpen="{x:Bind ViewModel.IsStatusVisible, Mode=OneWay}"
+                     Title="{x:Bind ViewModel.StatusSeverity, Mode=OneWay}"
+                     Message="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                     Severity="{x:Bind ViewModel.StatusSeverityKind, Mode=OneWay}"
+                     IsClosable="True" />
+
+            <!-- Command output card -->
+            <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    CornerRadius="8" Padding="16"
+                    Visibility="{x:Bind ViewModel.HasOutput, Mode=OneWay}">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="命令输出"
+                               Style="{StaticResource SubtitleTextBlockStyle}" FontSize="16" />
+                    <ScrollViewer Height="280" MaxHeight="280">
+                        <TextBlock Text="{x:Bind ViewModel.CommandOutput, Mode=OneWay}"
+                                   FontFamily="Cascadia Code"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   IsTextSelectionEnabled="True"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </ScrollViewer>
+                </StackPanel>
+            </Border>
+
+            <!-- Warning -->
+            <InfoBar Title="警告" Severity="Warning" IsOpen="True" IsClosable="False"
+                     Message="擦除 userdata 分区会清除设备全部数据，请提前备份。部分设备可能需要多次确认操作。" />
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

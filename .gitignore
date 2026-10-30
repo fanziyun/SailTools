@@ -1,0 +1,58 @@
+## Build output
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Packaging / publish output (regenerable by installer/build-setup.ps1)
+/artifacts/
+/dist/
+AppPackages/
+BundleArtifacts/
+*.msix
+*.msixupload
+*.appx
+*.appxbundle
+*.appxupload
+publish/
+PublishScripts/
+
+## Build logs
+[Ll]og/
+[Ll]ogs/
+*.log
+*.binlog
+
+## Test results
+[Tt]est[Rr]esult*/
+*.trx
+*.coverage
+*.coveragexml
+coverage/
+
+## NuGet
+*.nupkg
+*.snupkg
+*.nuget.props
+*.nuget.targets
+project.lock.json
+
+## Code analysis and tooling
+_ReSharper*/
+*.DotSettings.user
+*.dotCover
+.idea/
+
+## Generated files
+Generated\ Files/
+*_wpftmp.csproj
+
+## Runtime-generated files (crash dumps, user theme overrides)
+crash.log
+crash.log.old
+theme-settings.json

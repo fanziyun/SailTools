@@ -1,0 +1,374 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="FastTool.Pages.FlashPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="20" Margin="0,0,24,32">
+
+            <!-- Patch Page Header -->
+            <StackPanel Spacing="4">
+                <TextBlock Text="一键修补"
+                           Style="{StaticResource TitleTextBlockStyle}" FontSize="20" />
+                <TextBlock Text="选择 Magisk (APK) 或 AK3 (ZIP)，自动识别工具类型，修补 boot 镜像"
+                           Style="{StaticResource BodyTextBlockStyle}"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+
+            <!-- Patch Card -->
+            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    CornerRadius="8" Padding="24">
+                <StackPanel Spacing="16">
+
+                    <!-- Patch Tool File Picker (Magisk APK or AK3 ZIP) -->
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="修补工具 (Magisk APK 或 AK3 ZIP)" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button x:Name="BrowsePatchFileBtn"
+                                    Content="选择文件"
+                                    Click="BrowsePatchFile_Click" />
+                            <TextBlock x:Name="PatchFileNameLabel"
+                                       Text="请先选择修补文件"
+                                       VerticalAlignment="Center"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <Border x:Name="PatchTypeBadge"
+                                    Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                    CornerRadius="4"
+                                    Padding="8,2"
+                                    VerticalAlignment="Center"
+                                    Visibility="Collapsed">
+                                <TextBlock x:Name="PatchTypeBadgeText"
+                                           Text=""
+                                           FontSize="11"
+                                           FontWeight="SemiBold"
+                                           Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Boot Image File Picker -->
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="要修补的镜像文件 (boot.img / init_boot.img)" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button x:Name="BrowsePatchImageBtn"
+                                    Content="选择镜像文件"
+                                    Click="BrowsePatchImage_Click" />
+                            <TextBlock x:Name="PatchImageFileNameLabel"
+                                       Text="请先选择 .img 文件"
+                                       VerticalAlignment="Center"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Target Device (reuse from flash card) -->
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="目标设备" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                        <ComboBox x:Name="PatchDeviceCombo"
+                                  Width="400"
+                                  HorizontalAlignment="Left"
+                                  PlaceholderText="请先刷新设备列表"
+                                  ItemsSource="{x:Bind ViewModel.AvailableDevices, Mode=OneWay}"
+                                  SelectedItem="{x:Bind ViewModel.PatchSelectedDevice, Mode=TwoWay}" />
+                    </StackPanel>
+
+                    <!-- Patch Progress -->
+                    <Grid>
+                        <ProgressBar x:Name="PatchIndeterminateBar"
+                                     IsIndeterminate="True"
+                                     Background="Transparent"
+                                     Visibility="Collapsed" />
+                        <ProgressBar x:Name="PatchExactBar"
+                                     Value="0" Maximum="100"
+                                     Background="Transparent"
+                                     Visibility="Collapsed" />
+                    </Grid>
+
+                    <!-- Patch Action Buttons -->
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button x:Name="PatchBtn"
+                                Content="开始修补"
+                                Click="Patch_Click"
+                                Style="{StaticResource AccentButtonStyle}" />
+                        <ProgressRing x:Name="PatchRing"
+                                      IsActive="False"
+                                      Width="24" Height="24" />
+                        <TextBlock x:Name="PatchStatusLabel"
+                                   Text="就绪"
+                                   VerticalAlignment="Center"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+
+                    <!-- Patch Result (shown after successful patch) -->
+                    <Border x:Name="PatchResultBorder"
+                            Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            CornerRadius="8"
+                            Padding="16"
+                            Visibility="Collapsed">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="修补完成"
+                                       Style="{StaticResource BodyStrongTextBlockStyle}"
+                                       Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                            <TextBlock x:Name="PatchResultImageLabel"
+                                       Text=""
+                                       FontSize="12"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button x:Name="FlashPatchedBtn"
+                                        Content="刷入修补后的镜像"
+                                        Click="FlashPatchedImage_Click"
+                                        Style="{StaticResource AccentButtonStyle}" />
+                                <Button x:Name="OpenPatchFolderBtn"
+                                        Content="打开输出文件夹"
+                                        Click="OpenPatchOutputFolder_Click" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Patch-flow flash progress (shown inside patch card when flash-after-patch is active) -->
+                    <Border x:Name="PatchFlashBorder"
+                            Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            CornerRadius="8"
+                            Padding="16"
+                            Visibility="Collapsed">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="正在刷入修补后的镜像"
+                                       Style="{StaticResource BodyStrongTextBlockStyle}"
+                                       Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                            <TextBlock x:Name="PatchFlashPartitionLabel"
+                                       Text=""
+                                       FontSize="12"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+                                <Grid>
+                                    <ProgressBar x:Name="PatchFlashIndeterminateBar"
+                                                 IsIndeterminate="True"
+                                                 Background="Transparent"
+                                                 Visibility="Collapsed" />
+                                    <ProgressBar x:Name="PatchFlashExactBar"
+                                                 Value="0" Maximum="100"
+                                                 Background="Transparent"
+                                                 Visibility="Visible" />
+                                </Grid>
+                                <TextBlock x:Name="PatchFlashPercentLabel"
+                                           Grid.Column="1"
+                                           Text="0%"
+                                           FontFamily="Cascadia Code"
+                                           FontSize="14"
+                                           FontWeight="SemiBold"
+                                           VerticalAlignment="Center"
+                                           MinWidth="48"
+                                           TextAlignment="Right"
+                                           Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                <TextBlock x:Name="PatchFlashSpeedLabel"
+                                           Grid.Column="2"
+                                           Text=""
+                                           FontFamily="Cascadia Code"
+                                           FontSize="13"
+                                           VerticalAlignment="Center"
+                                           MinWidth="88"
+                                           TextAlignment="Right"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </Grid>
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <ProgressRing x:Name="PatchFlashRing"
+                                              IsActive="False"
+                                              Width="20" Height="20" />
+                                <TextBlock x:Name="PatchFlashStatusLabel"
+                                           Text="就绪"
+                                           VerticalAlignment="Center"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                </StackPanel>
+            </Border>
+
+            <!-- Page Header -->
+            <StackPanel x:Name="CustomFlashHeader" Spacing="4">
+                <TextBlock Text="自定义刷入"
+                           Style="{StaticResource TitleTextBlockStyle}" FontSize="20" />
+                <TextBlock Text="选择分区和镜像文件，一键完成刷写"
+                           Style="{StaticResource BodyTextBlockStyle}"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+
+            <!-- Flash Config Card -->
+            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    CornerRadius="8" Padding="24,20,24,20">
+                <StackPanel Spacing="16">
+
+                    <!-- Device selector -->
+                    <StackPanel Spacing="6">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <TextBlock Text="目标设备"
+                                       Style="{StaticResource BodyStrongTextBlockStyle}"
+                                       VerticalAlignment="Center" />
+                            <Button Grid.Column="1"
+                                    Click="RefreshDevices_Click"
+                                    Padding="10,4"
+                                    FontSize="12">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon FontFamily="Segoe Fluent Icons"
+                                              Glyph="&#xE72C;" FontSize="11" />
+                                    <TextBlock Text="刷新设备" FontSize="12" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                        <ComboBox x:Name="DeviceCombo"
+                                  Width="400"
+                                  HorizontalAlignment="Left"
+                                  PlaceholderText="请先刷新设备列表"
+                                  ItemsSource="{x:Bind ViewModel.AvailableDevices, Mode=OneWay}"
+                                  SelectedItem="{x:Bind ViewModel.SelectedDevice, Mode=TwoWay}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ProgressRing IsActive="{x:Bind ViewModel.IsRefreshingDevices, Mode=OneWay}"
+                                          Width="14" Height="14" />
+                            <TextBlock Text="{x:Bind ViewModel.DeviceRefreshMessage, Mode=OneWay}"
+                                       FontSize="12"
+                                       VerticalAlignment="Center"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Partition mode (RadioButtons right) + Image (right column) -->
+                    <Grid ColumnDefinitions="*,24,*" ColumnSpacing="0">
+                        <StackPanel Grid.Column="0" Spacing="6">
+                            <!-- Mode radio buttons (right-aligned, stacked) -->
+                            <StackPanel Spacing="4" HorizontalAlignment="Left">
+                                <RadioButton x:Name="PresetPartitionRadio"
+                                             Content="使用预设分区列表"
+                                             GroupName="PartitionMode"
+                                             Checked="PresetPartition_Checked" />
+                                <RadioButton x:Name="CustomPartitionRadio"
+                                             Content="自定义分区（手动输入）"
+                                             GroupName="PartitionMode"
+                                             Checked="CustomPartition_Checked" />
+                            </StackPanel>
+                            <!-- Preset: ComboBox -->
+                            <ComboBox x:Name="PartitionCombo"
+                                      Width="240"
+                                      HorizontalAlignment="Left"
+                                      ItemsSource="{x:Bind ViewModel.AvailablePartitions}"
+                                      SelectedItem="{x:Bind ViewModel.SelectedPartition, Mode=TwoWay}" />
+                            <!-- Custom: TextBox (hidden by default) -->
+                            <TextBox x:Name="CustomPartitionBox"
+                                     Width="240"
+                                     HorizontalAlignment="Left"
+                                     PlaceholderText="输入分区名，如 vendor_boot"
+                                     Text="{x:Bind ViewModel.CustomPartitionName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Visibility="Collapsed" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="6">
+                            <TextBlock Text="镜像文件" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                            <Button Content="选择镜像文件"
+                                    Click="BrowseImage_Click" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- File path display (read-only TextBox: scrollable + selectable) -->
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="镜像路径" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                        <TextBox x:Name="FileNameTextBox"
+                                 Text="请先选择 .img 文件"
+                                 IsReadOnly="True"
+                                 IsSpellCheckEnabled="False"
+                                 FontFamily="Cascadia Code"
+                                 FontSize="12"
+                                 HorizontalAlignment="Stretch" />
+                    </StackPanel>
+
+                    <!-- Progress bar + percentage + speed (collapsed by default; shown only during flashing) -->
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12"
+                          x:Name="ProgressRow" Visibility="Collapsed">
+                        <Grid>
+                            <ProgressBar x:Name="IndeterminateBar"
+                                         IsIndeterminate="True"
+                                         Background="Transparent"
+                                         Visibility="Collapsed" />
+                            <ProgressBar x:Name="ExactBar"
+                                         Value="0" Maximum="100"
+                                         Background="Transparent"
+                                         Visibility="Visible" />
+                        </Grid>
+                        <TextBlock x:Name="PercentLabel"
+                                   Grid.Column="1"
+                                   Text="0%"
+                                   FontFamily="Cascadia Code"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"
+                                   MinWidth="48"
+                                   TextAlignment="Right"
+                                   Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                        <TextBlock x:Name="SpeedLabel"
+                                   Grid.Column="2"
+                                   Text=""
+                                   FontFamily="Cascadia Code"
+                                   FontSize="13"
+                                   VerticalAlignment="Center"
+                                   MinWidth="88"
+                                   TextAlignment="Right"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </Grid>
+
+                    <!-- Action row (inside card) -->
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button x:Name="FlashBtn"
+                                Content="开始刷写"
+                                Click="Flash_Click"
+                                Style="{StaticResource AccentButtonStyle}" />
+                        <Button x:Name="CancelBtn"
+                                Content="取消"
+                                Click="Cancel_Click"
+                                IsEnabled="False" />
+                        <ProgressRing x:Name="FlashRing"
+                                      IsActive="False"
+                                      Width="22" Height="22"
+                                      VerticalAlignment="Center" />
+                        <TextBlock x:Name="StatusLabel"
+                                   Text="就绪"
+                                   VerticalAlignment="Center"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+
+                </StackPanel>
+            </Border>
+
+            <!-- Log Panel -->
+            <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    CornerRadius="8" Padding="16">
+                <StackPanel Spacing="8">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="刷写日志" Style="{StaticResource SubtitleTextBlockStyle}" FontSize="16" />
+                        <ToggleSwitch Grid.Column="1"
+                                      IsOn="{x:Bind ViewModel.IsLogVisible, Mode=TwoWay}"
+                                      OnContent="显示" OffContent="隐藏" />
+                    </Grid>
+                    <ScrollViewer x:Name="LogScroll"
+                                  Height="280"
+                                  MaxHeight="280">
+                        <TextBlock x:Name="LogTextBlock"
+                                   Text=""
+                                   FontFamily="Cascadia Code"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   IsTextSelectionEnabled="True" />
+                    </ScrollViewer>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

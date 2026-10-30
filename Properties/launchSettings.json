@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "363FastTool (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "363FastTool (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
