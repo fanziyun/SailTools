@@ -17,7 +17,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>14</LangVersion>
-    <!-- Disable WinRT AOT optimizer (source gen bug with .NET 10) -->
+    <!-- WinRT AOT optimizer must stay DISABLED. Re-tested on WindowsAppSDK 2.5.1:
+         enabling it still breaks the build (60 errors) — the WinRT source generator
+         emits WinRTExposedTypeAttribute with 3 args where only fewer exist, mangles
+         the "<RootNamespace>VtableClasses" identifier, and then the XAML compiler
+         itself dies with WMC9999 (NullReferenceException). -->
     <CsWinRTAotOptimizerEnabled>false</CsWinRTAotOptimizerEnabled>
     <PublishAot>false</PublishAot>
   </PropertyGroup>
@@ -43,8 +47,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.2.0" />
-    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.1839" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2957" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
   </ItemGroup>
 
