@@ -26,6 +26,23 @@
     <PublishAot>false</PublishAot>
   </PropertyGroup>
 
+  <!-- External tools (adb.exe / fastboot.exe / magiskboot.exe) live in the repo-level
+       tools/ directory and are copied to the output as a "platform-tools" subfolder.
+       That is exactly where the runtime already looks for them:
+       FastbootProcessService.FindToolInPlatformTools -> AppContext.BaseDirectory\platform-tools\
+       PatchService.FindMagiskBootPath               -> same folder as fastboot.exe, or the app dir
+       so no code has to know where the sources live. Content items would be picked up
+       by the WinUI resource indexer, so these are declared as None instead. -->
+  <PropertyGroup>
+    <ExternalToolsDir>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)', '..', '..', 'tools'))</ExternalToolsDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(ExternalToolsDir)platform-tools\**\*"
+          Link="platform-tools\%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <Content Include="Assets\SplashScreen.scale-200.png" />
     <Content Include="Assets\LockScreenLogo.scale-200.png" />
