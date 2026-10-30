@@ -1,9 +1,9 @@
 {
   "profiles": {
-    "363FastTool (Package)": {
+    "SailTool (Package)": {
       "commandName": "MsixPackage"
     },
-    "363FastTool (Unpackaged)": {
+    "SailTool (Unpackaged)": {
       "commandName": "Project"
     }
   }

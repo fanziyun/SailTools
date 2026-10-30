@@ -13,7 +13,7 @@
 
             <!-- Page Header (left-aligned) -->
             <StackPanel Spacing="2">
-                <TextBlock Text="363FastTool"
+                <TextBlock Text="SailTool"
                            Style="{StaticResource TitleTextBlockStyle}"
                            FontSize="22"
                            HorizontalAlignment="Left" />

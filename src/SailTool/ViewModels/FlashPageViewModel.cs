@@ -467,7 +467,7 @@ public partial class FlashPageViewModel(FastbootService fastboot) : ObservableOb
             if (hasDevice)
             {
                 // Device detected - use temp directory for auto-flash
-                outputDir = Path.Combine(Path.GetTempPath(), "FastTool_Patch_" + Guid.NewGuid().ToString("N")[..8]);
+                outputDir = Path.Combine(Path.GetTempPath(), "SailTool_Patch_" + Guid.NewGuid().ToString("N")[..8]);
                 Directory.CreateDirectory(outputDir);
                 AppendPatchLog($"[INFO] 工作目录: {outputDir}");
             }

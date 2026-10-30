@@ -1,3 +1,4 @@
+using System.Reflection;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace SailTool.ViewModels;
@@ -9,10 +10,33 @@ public sealed partial class SettingsPageViewModel : ObservableObject
         Path.Combine(AppContext.BaseDirectory, "platform-tools", "fastboot.exe");
 
     [ObservableProperty]
-    public partial string AppVersion { get; set; } = "1.0.0-preview";
+    public partial string AppVersion { get; set; } = ReadAssemblyVersion();
 
     [ObservableProperty]
     public partial string DeployMode { get; set; } = DetectDeployMode();
+
+    /// <summary>
+    /// Reads the version stamped into the assembly by MSBuild from the csproj
+    /// &lt;Version&gt; and &lt;VersionSuffix&gt; properties, so the number shown here
+    /// is the same one the installer puts in its artifact filename.
+    /// Falls back to the file version, then to "unknown" if neither is present.
+    /// </summary>
+    private static string ReadAssemblyVersion()
+    {
+        var assembly = typeof(SettingsPageViewModel).Assembly;
+
+        var informational = assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion;
+        if (!string.IsNullOrWhiteSpace(informational))
+        {
+            // Strip any "+buildmetadata" suffix if one is ever reintroduced.
+            var plus = informational.IndexOf('+');
+            return plus > 0 ? informational[..plus] : informational;
+        }
+
+        return assembly.GetName().Version?.ToString() ?? "unknown";
+    }
 
     private static string DetectDeployMode()
     {

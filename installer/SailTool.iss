@@ -1,19 +1,39 @@
-; 363FastTool Inno Setup script — framework-dependent build with runtime bootstrap
+; SailTool Inno Setup script — framework-dependent build with runtime bootstrap
 ; payload: artifacts\payload-fd2-slim  (needs .NET 10 Desktop Runtime + Windows App Runtime 2.x, auto-downloaded when missing)
-#define MyAppName "363FastTool"
+;
+; All defines below can be overridden from the command line with /D, which is how
+; installer\build-setup.ps1 drives this script. The fallbacks resolve the
+; repository root from this file's own location, so compiling the script by hand
+; also works from any checkout — no drive letter is hardcoded anywhere.
+#define MyAppName "SailTool"
 #define MyAppVersion "1.0.0"
 #define MyAppPublisher "AppPublisher"
-#define MyAppExeName "363FastTool.exe"
-#define PayloadDir "G:\app\363FastTool\363FastTool\artifacts\payload-fd2-slim"
+#define MyAppExeName "SailTool.exe"
+
+#ifndef RepoRoot
+  #define RepoRoot RemoveBackslash(ExtractFilePath(SourcePath)) + "\.."
+#endif
+#ifndef PayloadDir
+  #define PayloadDir RepoRoot + "\artifacts\payload-fd2-slim"
+#endif
+#ifndef MyOutputDir
+  #define MyOutputDir RepoRoot + "\artifacts\installer\out"
+#endif
+#ifndef SetupIcon
+  #define SetupIcon RepoRoot + "\src\SailTool\Assets\AppIcon.ico"
+#endif
 
 #define DotNetUrl "https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/10.0.14/windowsdesktop-runtime-10.0.14-win-x64.exe"
 #define DotNetFile "windowsdesktop-runtime-10.0.14-win-x64.exe"
 #define DotNetSha "91c2795a7b1e2480caa83fce9514dc2e2d21e277d9a297311faba6040bad7330"
-#define WarUrl "https://aka.ms/windowsappsdk/2.2/latest/windowsappruntimeinstall-x64.exe"
+#define WarUrl "https://aka.ms/windowsappsdk/2.5/latest/windowsappruntimeinstall-x64.exe"
 #define VcUrl "https://aka.ms/vs/17/release/vc_redist.x64.exe"
 
 [Setup]
-AppId={{8E3C1D62-4A7B-4F19-8B2C-6D0F5A9C1E44}
+; New AppId: the product was renamed from 363FastTool. Reusing the old AppId would
+; make Windows treat SailTool as an in-place upgrade of 363FastTool and leave a
+; mixed install behind; a fresh id installs alongside it and uninstalls cleanly.
+AppId={{C33E3811-051E-459E-B079-23156D61B5CF}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
@@ -21,9 +41,9 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
-OutputDir=G:\app\363FastTool\363FastTool\artifacts\installer\out
-OutputBaseFilename=363FastTool-Setup-{#MyAppVersion}-x64
-SetupIconFile=G:\app\363FastTool\363FastTool\Assets\AppIcon.ico
+OutputDir={#MyOutputDir}
+OutputBaseFilename={#MyAppName}-Setup-{#MyAppVersion}-x64
+SetupIconFile={#SetupIcon}
 UninstallDisplayIcon={app}\{#MyAppExeName}
 UninstallDisplayName={#MyAppName} {#MyAppVersion}
 Compression=lzma2/ultra64

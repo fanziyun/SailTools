@@ -6,7 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:local="using:SailTool"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    Title="363FastTool - 帆的妙妙小工具"
+    Title="SailTool - 帆的妙妙小工具"
     mc:Ignorable="d">
 
     <Window.SystemBackdrop>
@@ -20,7 +20,7 @@
         </Grid.RowDefinitions>
 
         <!-- Custom title bar with Mica -->
-        <TitleBar x:Name="AppTitleBar" Title="363FastTool" Subtitle="帆的妙妙小工具">
+        <TitleBar x:Name="AppTitleBar" Title="SailTool" Subtitle="帆的妙妙小工具">
             <TitleBar.IconSource>
                 <ImageIconSource ImageSource="Assets/AppIcon.ico" />
             </TitleBar.IconSource>
