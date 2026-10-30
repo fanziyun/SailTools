@@ -5,11 +5,83 @@ using SailTool.Services;
 
 namespace SailTool.ViewModels;
 
-public partial class FlashPageViewModel(FastbootService fastboot) : ObservableObject
+/// <summary>
+/// Drives the custom-flash card on <c>FlashPage</c>: device selection, partition
+/// choice, image browsing, flashing and the shared log panel.
+/// </summary>
+/// <remarks>
+/// <para>
+/// The boot-patching half of this page lives in <see cref="PatchPageViewModel"/>.
+/// The two are composed here rather than merged into the page, because
+/// <c>FlashPage.xaml</c> binds every patch control through
+/// <c>ViewModel.Patch*</c> and that XAML is not being touched. The one such
+/// binding the page needs — <see cref="PatchSelectedDevice"/> — is forwarded
+/// below; the rest are driven by the page's event handlers, which now call the
+/// patch ViewModel's commands directly.
+/// </para>
+/// <para>
+/// Cached for the session by <see cref="FastbootServiceAccessor"/>, so state
+/// survives navigating away and back.
+/// </para>
+/// </remarks>
+public partial class FlashPageViewModel : ObservableObject
 {
-    private readonly PatchService _patchService = new(fastboot.FastbootPath);
+    private readonly FastbootService _fastboot;
+
     // -- Static data --
     public string[] AvailablePartitions { get; } = FastbootService.FlashablePartitions;
+
+    /// <summary>
+    /// The patch card's ViewModel. The page reaches it for the patch commands;
+    /// this ViewModel only routes log lines into it and forwards the device
+    /// selection the XAML binds.
+    /// </summary>
+    public PatchPageViewModel Patch { get; }
+
+    /// <summary>
+    /// Forwards the patch card's target device. <c>FlashPage.xaml</c> binds this
+    /// as <c>ViewModel.PatchSelectedDevice</c>, so the name has to stay here even
+    /// though the state belongs to <see cref="PatchPageViewModel"/>.
+    /// </summary>
+    public string PatchSelectedDevice
+    {
+        get => Patch.PatchSelectedDevice;
+        set => Patch.PatchSelectedDevice = value;
+    }
+
+    /// <summary>
+    /// Builds the page ViewModel together with its cached patch counterpart and
+    /// wires the patch card's log output into this page's single log panel, so
+    /// patch lines and flash lines interleave in the order they happen — exactly
+    /// as they did when both halves lived in one class.
+    /// </summary>
+    public FlashPageViewModel(FastbootService fastboot)
+        : this(fastboot, FastbootServiceAccessor.CreatePatchViewModel())
+    {
+    }
+
+    /// <summary>
+    /// Explicit-composition constructor, used where a caller wants to supply its
+    /// own patch ViewModel (and is what the test project can reach without
+    /// touching the accessor's static caches).
+    /// </summary>
+    public FlashPageViewModel(FastbootService fastboot, PatchPageViewModel patch)
+    {
+        _fastboot = fastboot;
+        Patch = patch;
+        Patch.LogSink = AppendLog;
+
+        // <c>FlashPage.xaml</c> binds ComboBox SelectedItem to
+        // ViewModel.PatchSelectedDevice with Mode=TwoWay. That forwarding
+        // property is not itself observable, so re-raise the patch ViewModel's
+        // notification under this name — otherwise the ComboBox would stop
+        // seeing changes, which it did before the split.
+        Patch.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(PatchPageViewModel.PatchSelectedDevice))
+                OnPropertyChanged(nameof(PatchSelectedDevice));
+        };
+    }
 
     // -- Device selection --
     [ObservableProperty]
@@ -79,44 +151,6 @@ public partial class FlashPageViewModel(FastbootService fastboot) : ObservableOb
     }
 
     private CancellationTokenSource? _flashCts;
-    private CancellationTokenSource? _patchCts;
-
-    // -- Patch --
-    [ObservableProperty]
-    public partial string PatchType { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial string PatchFilePath { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial string PatchFileName { get; set; } = "请先选择修补文件";
-
-    [ObservableProperty]
-    public partial string PatchBootPartition { get; set; } = "boot";
-
-    [ObservableProperty]
-    public partial string PatchSelectedDevice { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial int PatchProgress { get; set; }
-
-    [ObservableProperty]
-    public partial bool IsPatching { get; set; }
-
-    [ObservableProperty]
-    public partial string PatchStatusText { get; set; } = "就绪";
-
-    [ObservableProperty]
-    public partial string PatchOutputPath { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial string PatchImageFilePath { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial string PatchImageFileName { get; set; } = "请先选择 .img 文件";
-
-    [ObservableProperty]
-    public partial string PatchOutputDirectory { get; set; } = string.Empty;
 
     // -- Commands --
 
@@ -150,7 +184,7 @@ public partial class FlashPageViewModel(FastbootService fastboot) : ObservableOb
             string rawOutput;
             try
             {
-                rawOutput = await fastboot.RunFastbootAsync("devices");
+                rawOutput = await _fastboot.RunFastbootAsync("devices");
             }
             catch (Exception ex)
             {
@@ -159,7 +193,7 @@ public partial class FlashPageViewModel(FastbootService fastboot) : ObservableOb
                 return;
             }
 
-            var devices = await fastboot.GetConnectedDevicesAsync();
+            var devices = await _fastboot.GetConnectedDevicesAsync();
             var newSerials = devices.Select(d => d.Serial).ToArray();
 
             // 列表完全没变 → 消息应已经是当前状态，直接返回
@@ -283,7 +317,7 @@ public partial class FlashPageViewModel(FastbootService fastboot) : ObservableOb
                 });
             };
 
-            var success = await fastboot.FlashImageAsync(
+            var success = await _fastboot.FlashImageAsync(
                 partition,
                 ImagePath,
                 progressReporter,
@@ -325,213 +359,10 @@ public partial class FlashPageViewModel(FastbootService fastboot) : ObservableOb
         StatusText = "正在取消...";
     }
 
-    // -- Patch Commands --
-    [RelayCommand]
-    private async Task BrowsePatchFileAsync()
-    {
-        var picker = new Windows.Storage.Pickers.FileOpenPicker();
-
-        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.Window);
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
-
-        picker.FileTypeFilter.Add(".apk");
-        picker.FileTypeFilter.Add(".zip");
-        picker.SuggestedStartLocation =
-            Windows.Storage.Pickers.PickerLocationId.Desktop;
-
-        var file = await picker.PickSingleFileAsync();
-        if (file is not null)
-        {
-            PatchFilePath = file.Path;
-            PatchFileName = file.Name;
-        }
-    }
-
-    [RelayCommand]
-    private async Task BrowsePatchImageAsync()
-    {
-        var picker = new Windows.Storage.Pickers.FileOpenPicker();
-
-        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.Window);
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
-
-        picker.FileTypeFilter.Add(".img");
-        picker.SuggestedStartLocation =
-            Windows.Storage.Pickers.PickerLocationId.Desktop;
-
-        var file = await picker.PickSingleFileAsync();
-        if (file is not null)
-        {
-            PatchImageFilePath = file.Path;
-            PatchImageFileName = file.Name;
-        }
-    }
-
-    [RelayCommand]
-    private async Task PatchAsync()
-    {
-        AppendPatchLog("[DEBUG] 开始修补流程...");
-        
-        // Validate inputs - 不需要检查 PatchType，因为会自动检测
-        if (string.IsNullOrWhiteSpace(PatchFilePath) || !File.Exists(PatchFilePath))
-        {
-            PatchStatusText = "请先选择修补工具 (Magisk APK 或 AK3 ZIP)";
-            AppendPatchLog($"[错误] {PatchStatusText}");
-            return;
-        }
-
-        AppendPatchLog($"[OK] 修补工具: {PatchFilePath}");
-
-        if (string.IsNullOrWhiteSpace(PatchImageFilePath) || !File.Exists(PatchImageFilePath))
-        {
-            PatchStatusText = "请先选择要修补的镜像文件";
-            AppendPatchLog($"[错误] {PatchStatusText}");
-            return;
-        }
-
-        AppendPatchLog($"[OK] 镜像文件: {PatchImageFilePath}");
-
-        // 自动检测修补工具类型
-        string fileExtension = Path.GetExtension(PatchFilePath).ToLowerInvariant();
-        string detectedType = fileExtension switch
-        {
-            ".apk" => "magisk",
-            ".zip" => "ak3",
-            _ => ""
-        };
-
-        if (string.IsNullOrEmpty(detectedType))
-        {
-            PatchStatusText = "无法识别修补工具类型（需要 .apk 或 .zip 文件）";
-            AppendPatchLog($"[错误] {PatchStatusText}");
-            return;
-        }
-
-        AppendPatchLog($"[OK] 检测到工具类型: {detectedType}");
-
-        PatchType = detectedType;
-
-        // 检查 magiskboot 是否存在
-        AppendPatchLog($"[DEBUG] 检查 magiskboot: {_patchService.HasMagiskBoot}");
-        AppendPatchLog($"[DEBUG] magiskboot 路径: {_patchService.MagiskBootPath}");
-        
-        if (!_patchService.HasMagiskBoot)
-        {
-            var errorMsg = $"找不到 magiskboot.exe 工具！\n\n" +
-                          $"请在以下位置之一放置 magiskboot.exe:\n" +
-                          $"• {_patchService.MagiskBootPath}\n" +
-                          $"• 应用目录: {Path.Combine(AppContext.BaseDirectory, "magiskboot.exe")}\n" +
-                          $"• platform-tools 目录";
-            
-            PatchStatusText = "[错误] 缺少 magiskboot.exe";
-            AppendPatchLog($"[错误] {errorMsg}");
-            
-            return;
-        }
-
-        // 检查是否检测到设备
-        bool hasDevice = !string.IsNullOrWhiteSpace(PatchSelectedDevice);
-
-        // 如果未检测到设备，使用输入文件所在目录作为输出
-        if (!hasDevice)
-        {
-            // 使用镜像文件所在的目录作为输出目录
-            PatchOutputDirectory = Path.GetDirectoryName(PatchImageFilePath) ?? "";
-            AppendPatchLog($"[INFO] 未检测设备，使用镜像文件目录: {PatchOutputDirectory}");
-        }
-
-        IsPatching = true;
-        PatchProgress = 0;
-        PatchStatusText = "准备修补 boot 镜像...";
-        AppendPatchLog($"[INFO] 修补工具: {detectedType} ({(detectedType == "magisk" ? "Magisk" : "AK3")})");
-        AppendPatchLog($"[INFO] 修补文件: {PatchFileName}");
-        AppendPatchLog($"[INFO] 要修补的镜像: {Path.GetFileName(PatchImageFilePath)}");
-        AppendPatchLog(hasDevice ? $"[INFO] 目标设备: {PatchSelectedDevice}" : $"[INFO] 输出目录: {PatchOutputDirectory}");
-
-        _patchCts = new CancellationTokenSource();
-
-        try
-        {
-            // Step 1: Check if magiskboot is available
-            if (!_patchService.HasMagiskBoot)
-            {
-                throw new FileNotFoundException(
-                    $"找不到 magiskboot.exe 工具。\n请将 magiskboot 放在以下位置之一:\n- {_patchService.MagiskBootPath}\n- 应用目录\n- platform-tools 目录",
-                    _patchService.MagiskBootPath);
-            }
-
-            AppendPatchLog($"[OK] 找到 magiskboot: {_patchService.MagiskBootPath}");
-
-            // Step 2: Determine output directory
-            string outputDir;
-            if (hasDevice)
-            {
-                // Device detected - use temp directory for auto-flash
-                outputDir = Path.Combine(Path.GetTempPath(), "SailTool_Patch_" + Guid.NewGuid().ToString("N")[..8]);
-                Directory.CreateDirectory(outputDir);
-                AppendPatchLog($"[INFO] 工作目录: {outputDir}");
-            }
-            else
-            {
-                // No device - use user-selected directory
-                outputDir = PatchOutputDirectory;
-                AppendPatchLog($"[INFO] 输出目录: {outputDir}");
-            }
-
-            // Step 3: Call PatchService to perform the actual patching
-            PatchStatusText = "开始修补 boot 镜像...";
-            
-            var patchedImagePath = await _patchService.PatchBootImageAsync(
-                PatchFilePath,
-                PatchImageFilePath,
-                outputDir,
-                message => AppendPatchLog(message),
-                _patchCts.Token);
-
-            PatchOutputPath = patchedImagePath;
-            
-            // Step 4: Clean up temp directory if no device (already in output dir)
-            if (!hasDevice && outputDir != PatchOutputDirectory && Directory.Exists(outputDir))
-            {
-                try
-                {
-                    Directory.Delete(outputDir, true);
-                }
-                catch
-                {
-                    // Ignore cleanup errors
-                }
-            }
-
-            PatchStatusText = hasDevice ? "修补完成，可以刷入设备" : $"修补完成，文件已保存到: {PatchOutputDirectory}";
-            AppendPatchLog($"[成功] 修补完成: {patchedImagePath}");
-        }
-        catch (OperationCanceledException)
-        {
-            PatchStatusText = "修补已取消";
-        }
-        catch (Exception ex)
-        {
-            PatchStatusText = $"[ERROR] 修补失败: {ex.Message}";
-            AppendPatchLog($"[ERROR] {ex.Message}");
-        }
-        finally
-        {
-            IsPatching = false;
-            _patchCts?.Dispose();
-            _patchCts = null;
-        }
-    }
-
-    private void AppendPatchLog(string message)
-    {
-        App.DispatcherQueue.TryEnqueue(() =>
-        {
-            LogText += message + "\n";
-            OnPropertyChanged(nameof(LogText));
-        });
-    }
-
+    /// <summary>
+    /// Appends a line to the shared log panel. Marshals onto the UI thread, since
+    /// fastboot output arrives on the stream reader's thread.
+    /// </summary>
     public void AppendLog(string message)
     {
         App.DispatcherQueue.TryEnqueue(() =>
@@ -539,23 +370,5 @@ public partial class FlashPageViewModel(FastbootService fastboot) : ObservableOb
             LogText += message + "\n";
             OnPropertyChanged(nameof(LogText));
         });
-    }
-
-    /// <summary>修补刷入完成后，用户确认重启到系统时调用</summary>
-    [RelayCommand]
-    private async Task RebootToSystemAsync()
-    {
-        try
-        {
-            AppendLog("[重启] 正在重启设备到系统...");
-            await fastboot.RunFastbootAsync("reboot");
-            AppendLog("[重启] 重启命令已发送");
-            PatchStatusText = "修补完成，设备正在重启到系统";
-        }
-        catch (Exception ex)
-        {
-            AppendLog($"[重启错误] {ex.Message}");
-            PatchStatusText = $"重启失败: {ex.Message}";
-        }
     }
 }

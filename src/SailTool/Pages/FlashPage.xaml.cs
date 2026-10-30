@@ -258,22 +258,22 @@ public sealed partial class FlashPage : Page
     {
         try
         {
-            await ViewModel.BrowsePatchFileCommand.ExecuteAsync(null);
+            await ViewModel.Patch.BrowsePatchFileCommand.ExecuteAsync(null);
 
             // 根据文件扩展名自动识别并显示徽章和文件路径
-            if (!string.IsNullOrEmpty(ViewModel.PatchFilePath))
+            if (!string.IsNullOrEmpty(ViewModel.Patch.PatchFilePath))
             {
                 // 显示文件大小和路径
-                var fileInfo = new System.IO.FileInfo(ViewModel.PatchFilePath);
+                var fileInfo = new System.IO.FileInfo(ViewModel.Patch.PatchFilePath);
                 string fileSize = fileInfo.Length > 1024 * 1024
                     ? $"{fileInfo.Length / (1024.0 * 1024.0):F2} MB"
                     : $"{fileInfo.Length / 1024.0:F2} KB";
 
-                PatchFileNameLabel.Text = $"{ViewModel.PatchFileName} ({fileSize})";
+                PatchFileNameLabel.Text = $"{ViewModel.Patch.PatchFileName} ({fileSize})";
                 PatchFileNameLabel.Foreground = Application.Current.Resources["TextFillColorPrimaryBrush"] as Microsoft.UI.Xaml.Media.Brush;
 
                 // 识别文件类型并显示徽章
-                string extension = System.IO.Path.GetExtension(ViewModel.PatchFilePath).ToLowerInvariant();
+                string extension = System.IO.Path.GetExtension(ViewModel.Patch.PatchFilePath).ToLowerInvariant();
                 string detectedType = extension switch
                 {
                     ".apk" => "Magisk",
@@ -281,7 +281,7 @@ public sealed partial class FlashPage : Page
                     _ => "未知"
                 };
 
-                ViewModel.PatchType = extension switch
+                ViewModel.Patch.PatchType = extension switch
                 {
                     ".apk" => "magisk",
                     ".zip" => "ak3",
@@ -302,17 +302,17 @@ public sealed partial class FlashPage : Page
     {
         try
         {
-            await ViewModel.BrowsePatchImageCommand.ExecuteAsync(null);
+            await ViewModel.Patch.BrowsePatchImageCommand.ExecuteAsync(null);
 
             // 显示文件大小和路径
-            if (!string.IsNullOrEmpty(ViewModel.PatchImageFilePath))
+            if (!string.IsNullOrEmpty(ViewModel.Patch.PatchImageFilePath))
             {
-                var fileInfo = new System.IO.FileInfo(ViewModel.PatchImageFilePath);
+                var fileInfo = new System.IO.FileInfo(ViewModel.Patch.PatchImageFilePath);
                 string fileSize = fileInfo.Length > 1024 * 1024
                     ? $"{fileInfo.Length / (1024.0 * 1024.0):F2} MB"
                     : $"{fileInfo.Length / 1024.0:F2} KB";
 
-                PatchImageFileNameLabel.Text = $"{ViewModel.PatchImageFileName} ({fileSize})";
+                PatchImageFileNameLabel.Text = $"{ViewModel.Patch.PatchImageFileName} ({fileSize})";
                 PatchImageFileNameLabel.Foreground = Application.Current.Resources["TextFillColorPrimaryBrush"] as Microsoft.UI.Xaml.Media.Brush;
             }
         }
@@ -326,16 +326,16 @@ public sealed partial class FlashPage : Page
     {
         try
         {
-            await ViewModel.PatchCommand.ExecuteAsync(null);
+            await ViewModel.Patch.PatchCommand.ExecuteAsync(null);
 
             // 修补完成后显示结果面板
-            if (!string.IsNullOrEmpty(ViewModel.PatchOutputPath))
+            if (!string.IsNullOrEmpty(ViewModel.Patch.PatchOutputPath))
             {
                 PatchResultBorder.Visibility = Visibility.Visible;
-                PatchResultImageLabel.Text = $"输出文件: {Path.GetFileName(ViewModel.PatchOutputPath)}";
+                PatchResultImageLabel.Text = $"输出文件: {Path.GetFileName(ViewModel.Patch.PatchOutputPath)}";
 
                 // 根据是否检测到设备显示不同的按钮
-                bool hasDevice = !string.IsNullOrWhiteSpace(ViewModel.PatchSelectedDevice);
+                bool hasDevice = !string.IsNullOrWhiteSpace(ViewModel.Patch.PatchSelectedDevice);
                 FlashPatchedBtn.Visibility = hasDevice ? Visibility.Visible : Visibility.Collapsed;
                 OpenPatchFolderBtn.Visibility = hasDevice ? Visibility.Collapsed : Visibility.Visible;
             }
@@ -351,14 +351,14 @@ public sealed partial class FlashPage : Page
         try
         {
             // 使用修补后的镜像文件刷入对应的分区
-            if (!string.IsNullOrEmpty(ViewModel.PatchOutputPath))
+            if (!string.IsNullOrEmpty(ViewModel.Patch.PatchOutputPath))
             {
                 // 切换到快速刷入模式，设置镜像文件和分区
-                ViewModel.ImagePath = ViewModel.PatchOutputPath;
-                ViewModel.ImageFileName = System.IO.Path.GetFileName(ViewModel.PatchOutputPath);
+                ViewModel.ImagePath = ViewModel.Patch.PatchOutputPath;
+                ViewModel.ImageFileName = System.IO.Path.GetFileName(ViewModel.Patch.PatchOutputPath);
 
                 // 用原始镜像文件名推断分区（boot.img -> boot, init_boot.img -> init_boot）
-                string originalName = System.IO.Path.GetFileNameWithoutExtension(ViewModel.PatchImageFilePath)
+                string originalName = System.IO.Path.GetFileNameWithoutExtension(ViewModel.Patch.PatchImageFilePath)
                     .ToLowerInvariant();
                 string partition = originalName switch
                 {
@@ -370,12 +370,12 @@ public sealed partial class FlashPage : Page
                 ViewModel.SelectedPartition = partition;
 
                 // 更新日志
-                ViewModel.AppendLog($"[补修] 快速刷入: {partition} ({Path.GetFileName(ViewModel.PatchOutputPath)})");
+                ViewModel.AppendLog($"[补修] 快速刷入: {partition} ({Path.GetFileName(ViewModel.Patch.PatchOutputPath)})");
 
                 // 切到 patch-flow 模式：隐藏「修补完成」卡片，显示「刷入中」卡片
                 PatchResultBorder.Visibility    = Visibility.Collapsed;
                 PatchFlashBorder.Visibility     = Visibility.Visible;
-                PatchFlashPartitionLabel.Text  = $"分区：{partition}    镜像：{Path.GetFileName(ViewModel.PatchOutputPath)}";
+                PatchFlashPartitionLabel.Text  = $"分区：{partition}    镜像：{Path.GetFileName(ViewModel.Patch.PatchOutputPath)}";
                 _isPatchFlowActive             = true;
 
                 // 自动触发刷写
@@ -396,7 +396,7 @@ public sealed partial class FlashPage : Page
                     };
 
                     if (await dialog.ShowAsync() == ContentDialogResult.Primary)
-                        await ViewModel.RebootToSystemCommand.ExecuteAsync(null);
+                        await ViewModel.Patch.RebootToSystemCommand.ExecuteAsync(null);
                 }
             }
         }
@@ -410,9 +410,9 @@ public sealed partial class FlashPage : Page
     {
         try
         {
-            if (!string.IsNullOrEmpty(ViewModel.PatchOutputDirectory) && System.IO.Directory.Exists(ViewModel.PatchOutputDirectory))
+            if (!string.IsNullOrEmpty(ViewModel.Patch.PatchOutputDirectory) && System.IO.Directory.Exists(ViewModel.Patch.PatchOutputDirectory))
             {
-                await Windows.System.Launcher.LaunchFolderPathAsync(ViewModel.PatchOutputDirectory);
+                await Windows.System.Launcher.LaunchFolderPathAsync(ViewModel.Patch.PatchOutputDirectory);
             }
         }
         catch (Exception ex)
@@ -443,26 +443,26 @@ public sealed partial class FlashPage : Page
         }
 
         // 一键修补 — 工具文件 + 徽章
-        if (!string.IsNullOrEmpty(ViewModel.PatchFilePath))
+        if (!string.IsNullOrEmpty(ViewModel.Patch.PatchFilePath))
         {
             string label;
-            if (System.IO.File.Exists(ViewModel.PatchFilePath))
+            if (System.IO.File.Exists(ViewModel.Patch.PatchFilePath))
             {
-                var info = new System.IO.FileInfo(ViewModel.PatchFilePath);
+                var info = new System.IO.FileInfo(ViewModel.Patch.PatchFilePath);
                 string size = info.Length > 1024 * 1024
                     ? $"{info.Length / (1024.0 * 1024.0):F2} MB"
                     : $"{info.Length / 1024.0:F2} KB";
-                label = $"{ViewModel.PatchFileName} ({size})";
+                label = $"{ViewModel.Patch.PatchFileName} ({size})";
             }
             else
             {
-                label = ViewModel.PatchFileName;
+                label = ViewModel.Patch.PatchFileName;
             }
             PatchFileNameLabel.Text = label;
             PatchFileNameLabel.Foreground = Application.Current.Resources["TextFillColorPrimaryBrush"] as Microsoft.UI.Xaml.Media.Brush;
 
             // 类型徽章
-            string badge = ViewModel.PatchType switch
+            string badge = ViewModel.Patch.PatchType switch
             {
                 "magisk" => "Magisk",
                 "ak3" => "AK3",
@@ -476,20 +476,20 @@ public sealed partial class FlashPage : Page
         }
 
         // 一键修补 — 目标镜像
-        if (!string.IsNullOrEmpty(ViewModel.PatchImageFilePath))
+        if (!string.IsNullOrEmpty(ViewModel.Patch.PatchImageFilePath))
         {
             string label;
-            if (System.IO.File.Exists(ViewModel.PatchImageFilePath))
+            if (System.IO.File.Exists(ViewModel.Patch.PatchImageFilePath))
             {
-                var info = new System.IO.FileInfo(ViewModel.PatchImageFilePath);
+                var info = new System.IO.FileInfo(ViewModel.Patch.PatchImageFilePath);
                 string size = info.Length > 1024 * 1024
                     ? $"{info.Length / (1024.0 * 1024.0):F2} MB"
                     : $"{info.Length / 1024.0:F2} KB";
-                label = $"{ViewModel.PatchImageFileName} ({size})";
+                label = $"{ViewModel.Patch.PatchImageFileName} ({size})";
             }
             else
             {
-                label = ViewModel.PatchImageFileName;
+                label = ViewModel.Patch.PatchImageFileName;
             }
             PatchImageFileNameLabel.Text = label;
             PatchImageFileNameLabel.Foreground = Application.Current.Resources["TextFillColorPrimaryBrush"] as Microsoft.UI.Xaml.Media.Brush;

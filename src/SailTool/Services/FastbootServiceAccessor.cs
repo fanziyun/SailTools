@@ -33,6 +33,7 @@ internal static class FastbootServiceAccessor
 
     // 缓存 ViewModel 实例，实现会话内持久化（切页面不丢失），重启自然清空
     private static FlashPageViewModel?      _cachedFlashVM;
+    private static PatchPageViewModel?      _cachedPatchVM;
     private static ROMFlashPageViewModel?   _cachedROMFlashVM;
 
     public static HomePageViewModel CreateHomeViewModel()
@@ -40,6 +41,15 @@ internal static class FastbootServiceAccessor
 
     public static FlashPageViewModel CreateFlashViewModel()
         => _cachedFlashVM ??= new(Instance);
+
+    /// <summary>
+    /// The patch card's ViewModel. Cached on its own so that
+    /// <see cref="CreateFlashViewModel"/> composing with it stays idempotent:
+    /// rebuilding the flash page reuses the same patch state rather than
+    /// replacing it, which is what keeps the picked files across navigation.
+    /// </summary>
+    public static PatchPageViewModel CreatePatchViewModel()
+        => _cachedPatchVM ??= new(Instance);
 
     public static ROMFlashPageViewModel CreateROMFlashViewModel()
         => _cachedROMFlashVM ??= new(Instance);
