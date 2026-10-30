@@ -1,10 +1,10 @@
 using System.Diagnostics;
 using System.Text.Json;
-using FastTool.Services;
+using SailTool.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
-namespace FastTool;
+namespace SailTool;
 
 public partial class App : Application
 {

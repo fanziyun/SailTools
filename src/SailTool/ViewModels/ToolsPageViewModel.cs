@@ -1,9 +1,9 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using FastTool.Services;
+using SailTool.Services;
 
-namespace FastTool.ViewModels;
+namespace SailTool.ViewModels;
 
 public sealed partial class ToolsPageViewModel(FastbootService fastboot) : ObservableObject
 {

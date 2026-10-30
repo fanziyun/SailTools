@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.IO.Compression;
 
-namespace FastTool.Services;
+namespace SailTool.Services;
 
 /// <summary>
 /// 修补 boot 镜像的核心服务，支持 Magisk 和 AK3

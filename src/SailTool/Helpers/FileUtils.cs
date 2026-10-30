@@ -1,4 +1,4 @@
-namespace FastTool.Helpers;
+namespace SailTool.Helpers;
 
 public static class FileUtils
 {

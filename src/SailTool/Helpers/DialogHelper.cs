@@ -1,6 +1,6 @@
 using Microsoft.UI.Xaml.Controls;
 
-namespace FastTool.Helpers;
+namespace SailTool.Helpers;
 
 public static class DialogHelper
 {

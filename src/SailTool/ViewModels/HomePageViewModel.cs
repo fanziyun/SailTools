@@ -1,9 +1,9 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using FastTool.Models;
-using FastTool.Services;
+using SailTool.Models;
+using SailTool.Services;
 
-namespace FastTool.ViewModels;
+namespace SailTool.ViewModels;
 
 public sealed partial class HomePageViewModel(FastbootService fastboot) : ObservableObject
 {

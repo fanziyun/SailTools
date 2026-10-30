@@ -1,6 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace FastTool.ViewModels;
+namespace SailTool.ViewModels;
 
 public sealed partial class SettingsPageViewModel : ObservableObject
 {

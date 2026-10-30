@@ -1,4 +1,4 @@
-namespace FastTool.Models;
+namespace SailTool.Models;
 
 /// <summary>
 /// Represents a progress update from a fastboot flash operation.

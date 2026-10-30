@@ -1,4 +1,4 @@
-namespace FastTool.Enums;
+namespace SailTool.Enums;
 
 /// <summary>
 /// Connection type for an Android device.

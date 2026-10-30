@@ -1,4 +1,4 @@
-namespace FastTool.Enums;
+namespace SailTool.Enums;
 
 /// <summary>
 /// Bootloader lock status.

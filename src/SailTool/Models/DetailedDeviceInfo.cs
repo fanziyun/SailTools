@@ -1,4 +1,4 @@
-namespace FastTool.Models;
+namespace SailTool.Models;
 
 /// <summary>
 /// 详细设备信息（通过 fastboot getvar / adb getprop 获取）。

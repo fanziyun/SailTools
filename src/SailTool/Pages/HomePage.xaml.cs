@@ -2,13 +2,13 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
-using FastTool.Helpers;
-using FastTool.Models;
-using FastTool.Services;
-using FastTool.ViewModels;
+using SailTool.Helpers;
+using SailTool.Models;
+using SailTool.Services;
+using SailTool.ViewModels;
 using Color = Windows.UI.Color;
 
-namespace FastTool.Pages;
+namespace SailTool.Pages;
 
 public sealed partial class HomePage : Page
 {

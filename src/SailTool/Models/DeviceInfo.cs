@@ -1,4 +1,4 @@
-namespace FastTool.Models;
+namespace SailTool.Models;
 
 /// <summary>
 /// Represents a device connected via ADB or Fastboot.

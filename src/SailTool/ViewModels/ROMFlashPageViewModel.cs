@@ -1,10 +1,10 @@
 using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using FastTool.Services;
+using SailTool.Services;
 using Windows.Storage.Pickers;
 
-namespace FastTool.ViewModels;
+namespace SailTool.ViewModels;
 
 public partial class ROMFlashPageViewModel(FastbootService fastboot) : ObservableObject
 {

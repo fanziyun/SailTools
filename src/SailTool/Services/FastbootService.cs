@@ -1,9 +1,9 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
-using FastTool.Models;
+using SailTool.Models;
 
-namespace FastTool.Services;
+namespace SailTool.Services;
 
 /// <summary>
 /// High-level fastboot operations (device detection, flashing).

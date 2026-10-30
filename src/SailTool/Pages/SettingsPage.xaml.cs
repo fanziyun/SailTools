@@ -1,8 +1,8 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using FastTool.ViewModels;
+using SailTool.ViewModels;
 
-namespace FastTool.Pages;
+namespace SailTool.Pages;
 
 public sealed partial class SettingsPage : Page
 {

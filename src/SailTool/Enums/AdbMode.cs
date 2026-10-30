@@ -1,4 +1,4 @@
-namespace FastTool.Enums;
+namespace SailTool.Enums;
 
 /// <summary>
 /// Device mode when connected via ADB or Fastboot.

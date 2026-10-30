@@ -1,6 +1,6 @@
 using Windows.Storage.Pickers;
 
-namespace FastTool.Helpers;
+namespace SailTool.Helpers;
 
 public static class FilePickerHelper
 {

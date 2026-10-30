@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <Page
-    x:Class="FastTool.Pages.HomePage"
+    x:Class="SailTool.Pages.HomePage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -216,7 +216,7 @@
                                   SelectedItem="{x:Bind ViewModel.SelectedDevice, Mode=TwoWay}">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate x:DataType="models:DeviceInfo"
-                                              xmlns:models="using:FastTool.Models">
+                                              xmlns:models="using:SailTool.Models">
                                     <StackPanel Spacing="2" Padding="0,2">
                                         <TextBlock Text="{x:Bind DisplayName}"
                                                    Style="{StaticResource BodyStrongTextBlockStyle}"

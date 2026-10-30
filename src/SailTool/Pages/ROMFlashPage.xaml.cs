@@ -1,9 +1,9 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using FastTool.Services;
-using FastTool.ViewModels;
+using SailTool.Services;
+using SailTool.ViewModels;
 
-namespace FastTool.Pages;
+namespace SailTool.Pages;
 
 public sealed partial class ROMFlashPage : Page
 {

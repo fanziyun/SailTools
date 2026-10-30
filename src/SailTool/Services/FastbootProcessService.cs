@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 
-namespace FastTool.Services;
+namespace SailTool.Services;
 
 /// <summary>
 /// Low-level process management for fastboot.exe and adb.exe.

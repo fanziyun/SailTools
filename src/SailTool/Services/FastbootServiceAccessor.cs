@@ -1,6 +1,6 @@
-using FastTool.ViewModels;
+using SailTool.ViewModels;
 
-namespace FastTool.Services;
+namespace SailTool.Services;
 
 /// <summary>
 /// Global accessor for the singleton <see cref="FastbootService"/> and
