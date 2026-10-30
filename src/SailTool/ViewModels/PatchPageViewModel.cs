@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SailTool.Helpers;
 using SailTool.Services;
 
 namespace SailTool.ViewModels;
@@ -95,17 +96,7 @@ public partial class PatchPageViewModel(FastbootService fastboot) : ObservableOb
     [RelayCommand]
     private async Task BrowsePatchFileAsync()
     {
-        var picker = new Windows.Storage.Pickers.FileOpenPicker();
-
-        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.Window);
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
-
-        picker.FileTypeFilter.Add(".apk");
-        picker.FileTypeFilter.Add(".zip");
-        picker.SuggestedStartLocation =
-            Windows.Storage.Pickers.PickerLocationId.Desktop;
-
-        var file = await picker.PickSingleFileAsync();
+        var file = await FilePickerHelper.PickStorageFileAsync(App.Window, [".apk", ".zip"]);
         if (file is not null)
         {
             PatchFilePath = file.Path;
@@ -116,16 +107,7 @@ public partial class PatchPageViewModel(FastbootService fastboot) : ObservableOb
     [RelayCommand]
     private async Task BrowsePatchImageAsync()
     {
-        var picker = new Windows.Storage.Pickers.FileOpenPicker();
-
-        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.Window);
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
-
-        picker.FileTypeFilter.Add(".img");
-        picker.SuggestedStartLocation =
-            Windows.Storage.Pickers.PickerLocationId.Desktop;
-
-        var file = await picker.PickSingleFileAsync();
+        var file = await FilePickerHelper.PickStorageFileAsync(App.Window, [".img"]);
         if (file is not null)
         {
             PatchImageFilePath = file.Path;

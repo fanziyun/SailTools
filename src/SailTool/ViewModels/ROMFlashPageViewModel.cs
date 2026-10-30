@@ -65,13 +65,13 @@ public partial class ROMFlashPageViewModel(FastbootService fastboot) : Observabl
         private set { _logText = value; OnPropertyChanged(); }
     }
 
+    /// <summary>
+    /// Appends a timestamped line to this page's log. Unlike the custom-flash log,
+    /// ROM flashing prefixes every line with <c>[HH:mm:ss]</c> because a line-flash
+    /// runs across many partitions and the sequence matters when reading it back.
+    /// </summary>
     private void AppendLog(string msg)
-    {
-        App.DispatcherQueue.TryEnqueue(() =>
-        {
-            LogText += $"[{DateTime.Now:HH:mm:ss}] {msg}\n";
-        });
-    }
+        => SailTool.Helpers.LogWriter.Append(() => LogText, t => LogText = t, msg, timestamped: true);
 
     // ══════════════════════════════════════════════════════════════
     //  选择文件夹
@@ -324,19 +324,18 @@ public partial class ROMFlashPageViewModel(FastbootService fastboot) : Observabl
         var currentPath = psi.EnvironmentVariables["PATH"] ?? "";
         psi.EnvironmentVariables["PATH"] = $"{fbDir};{currentPath}";
 
+        // AppendLog already marshals onto the UI thread, so no outer TryEnqueue
+        // is needed here; adding one only delayed the timestamp by a hop.
+        void OnData(object? _, DataReceivedEventArgs e)
+        {
+            if (e.Data is not null) AppendLog(e.Data);
+        }
+
         using var process       = new Process { StartInfo = psi, EnableRaisingEvents = true };
         var       tcsCompletion = new TaskCompletionSource<bool>();
 
-        process.OutputDataReceived += (_, e) =>
-        {
-            if (e.Data is null) return;
-            App.DispatcherQueue.TryEnqueue(() => AppendLog(e.Data));
-        };
-        process.ErrorDataReceived += (_, e) =>
-        {
-            if (e.Data is null) return;
-            App.DispatcherQueue.TryEnqueue(() => AppendLog(e.Data));
-        };
+        process.OutputDataReceived += OnData;
+        process.ErrorDataReceived  += OnData;
         process.Exited += (_, _) =>
             tcsCompletion.TrySetResult(process.ExitCode == 0);
 

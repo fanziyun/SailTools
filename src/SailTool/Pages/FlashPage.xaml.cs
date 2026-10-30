@@ -69,6 +69,36 @@ public sealed partial class FlashPage : Page
         }
     }
 
+    // ── Shared UI helpers ─────────────────────────────────────────
+
+    /// <summary>
+    /// The theme brush file-name labels switch to once a file is picked, so they
+    /// read as filled-in rather than as placeholder text.
+    /// </summary>
+    private static Microsoft.UI.Xaml.Media.Brush? PrimaryTextBrush =>
+        Application.Current.Resources["TextFillColorPrimaryBrush"] as Microsoft.UI.Xaml.Media.Brush;
+
+    /// <summary>
+    /// Sets a file label to "name (size)" and promotes it to the primary brush.
+    /// Falls back to the bare name when the file is not on disk.
+    /// </summary>
+    private static void SetFileLabel(TextBlock label, string fileName, string filePath)
+    {
+        var size = SailTool.Helpers.FileUtils.FormatFileSize(filePath);
+        label.Text = string.IsNullOrEmpty(size) ? fileName : $"{fileName} ({size})";
+        label.Foreground = PrimaryTextBrush;
+    }
+
+    /// <summary>
+    /// Same for the single-line path box, which shows the full path plus size.
+    /// </summary>
+    private static void SetFilePathBox(TextBox box, string filePath)
+    {
+        var size = SailTool.Helpers.FileUtils.FormatFileSize(filePath);
+        box.Text = string.IsNullOrEmpty(size) ? filePath : $"{filePath}  ({size})";
+        box.Foreground = PrimaryTextBrush;
+    }
+
     private void ViewModel_PropertyChanged(object? sender,
         System.ComponentModel.PropertyChangedEventArgs e)
     {
@@ -263,14 +293,8 @@ public sealed partial class FlashPage : Page
             // 根据文件扩展名自动识别并显示徽章和文件路径
             if (!string.IsNullOrEmpty(ViewModel.Patch.PatchFilePath))
             {
-                // 显示文件大小和路径
-                var fileInfo = new System.IO.FileInfo(ViewModel.Patch.PatchFilePath);
-                string fileSize = fileInfo.Length > 1024 * 1024
-                    ? $"{fileInfo.Length / (1024.0 * 1024.0):F2} MB"
-                    : $"{fileInfo.Length / 1024.0:F2} KB";
-
-                PatchFileNameLabel.Text = $"{ViewModel.Patch.PatchFileName} ({fileSize})";
-                PatchFileNameLabel.Foreground = Application.Current.Resources["TextFillColorPrimaryBrush"] as Microsoft.UI.Xaml.Media.Brush;
+                SetFileLabel(PatchFileNameLabel,
+                    ViewModel.Patch.PatchFileName, ViewModel.Patch.PatchFilePath);
 
                 // 识别文件类型并显示徽章
                 string extension = System.IO.Path.GetExtension(ViewModel.Patch.PatchFilePath).ToLowerInvariant();
@@ -307,13 +331,8 @@ public sealed partial class FlashPage : Page
             // 显示文件大小和路径
             if (!string.IsNullOrEmpty(ViewModel.Patch.PatchImageFilePath))
             {
-                var fileInfo = new System.IO.FileInfo(ViewModel.Patch.PatchImageFilePath);
-                string fileSize = fileInfo.Length > 1024 * 1024
-                    ? $"{fileInfo.Length / (1024.0 * 1024.0):F2} MB"
-                    : $"{fileInfo.Length / 1024.0:F2} KB";
-
-                PatchImageFileNameLabel.Text = $"{ViewModel.Patch.PatchImageFileName} ({fileSize})";
-                PatchImageFileNameLabel.Foreground = Application.Current.Resources["TextFillColorPrimaryBrush"] as Microsoft.UI.Xaml.Media.Brush;
+                SetFileLabel(PatchImageFileNameLabel,
+                    ViewModel.Patch.PatchImageFileName, ViewModel.Patch.PatchImageFilePath);
             }
         }
         catch (Exception ex)
@@ -427,39 +446,14 @@ public sealed partial class FlashPage : Page
         // 快速刷入 — 镜像路径
         if (!string.IsNullOrEmpty(ViewModel.ImagePath))
         {
-            if (System.IO.File.Exists(ViewModel.ImagePath))
-            {
-                var info = new System.IO.FileInfo(ViewModel.ImagePath);
-                string size = info.Length > 1024 * 1024
-                    ? $"{info.Length / (1024.0 * 1024.0):F2} MB"
-                    : $"{info.Length / 1024.0:F2} KB";
-                FileNameTextBox.Text = $"{ViewModel.ImagePath}  ({size})";
-            }
-            else
-            {
-                FileNameTextBox.Text = ViewModel.ImagePath;
-            }
-            FileNameTextBox.Foreground = Application.Current.Resources["TextFillColorPrimaryBrush"] as Microsoft.UI.Xaml.Media.Brush;
+            SetFilePathBox(FileNameTextBox, ViewModel.ImagePath);
         }
 
         // 一键修补 — 工具文件 + 徽章
         if (!string.IsNullOrEmpty(ViewModel.Patch.PatchFilePath))
         {
-            string label;
-            if (System.IO.File.Exists(ViewModel.Patch.PatchFilePath))
-            {
-                var info = new System.IO.FileInfo(ViewModel.Patch.PatchFilePath);
-                string size = info.Length > 1024 * 1024
-                    ? $"{info.Length / (1024.0 * 1024.0):F2} MB"
-                    : $"{info.Length / 1024.0:F2} KB";
-                label = $"{ViewModel.Patch.PatchFileName} ({size})";
-            }
-            else
-            {
-                label = ViewModel.Patch.PatchFileName;
-            }
-            PatchFileNameLabel.Text = label;
-            PatchFileNameLabel.Foreground = Application.Current.Resources["TextFillColorPrimaryBrush"] as Microsoft.UI.Xaml.Media.Brush;
+            SetFileLabel(PatchFileNameLabel,
+                ViewModel.Patch.PatchFileName, ViewModel.Patch.PatchFilePath);
 
             // 类型徽章
             string badge = ViewModel.Patch.PatchType switch
@@ -478,21 +472,8 @@ public sealed partial class FlashPage : Page
         // 一键修补 — 目标镜像
         if (!string.IsNullOrEmpty(ViewModel.Patch.PatchImageFilePath))
         {
-            string label;
-            if (System.IO.File.Exists(ViewModel.Patch.PatchImageFilePath))
-            {
-                var info = new System.IO.FileInfo(ViewModel.Patch.PatchImageFilePath);
-                string size = info.Length > 1024 * 1024
-                    ? $"{info.Length / (1024.0 * 1024.0):F2} MB"
-                    : $"{info.Length / 1024.0:F2} KB";
-                label = $"{ViewModel.Patch.PatchImageFileName} ({size})";
-            }
-            else
-            {
-                label = ViewModel.Patch.PatchImageFileName;
-            }
-            PatchImageFileNameLabel.Text = label;
-            PatchImageFileNameLabel.Foreground = Application.Current.Resources["TextFillColorPrimaryBrush"] as Microsoft.UI.Xaml.Media.Brush;
+            SetFileLabel(PatchImageFileNameLabel,
+                ViewModel.Patch.PatchImageFileName, ViewModel.Patch.PatchImageFilePath);
         }
 
         // 日志内容（ViewModel 缓存了，新 Page 的 TextBlock 需要手动恢复）

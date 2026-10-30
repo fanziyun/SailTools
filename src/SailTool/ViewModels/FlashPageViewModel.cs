@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SailTool.Helpers;
 using SailTool.Models;
 using SailTool.Services;
 
@@ -242,19 +243,11 @@ public partial class FlashPageViewModel : ObservableObject
     [RelayCommand]
     private async Task BrowseImageAsync()
     {
-        var picker = new Windows.Storage.Pickers.FileOpenPicker();
+        // "*" is required for the dialog to offer an "All files" entry, which is
+        // what lets a user pick a payload whose extension is not in the list.
+        var file = await FilePickerHelper.PickStorageFileAsync(
+            App.Window, [".img", ".bin", ".zip", "*"]);
 
-        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.Window);
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
-
-        picker.FileTypeFilter.Add(".img");
-        picker.FileTypeFilter.Add(".bin");
-        picker.FileTypeFilter.Add(".zip");
-        picker.FileTypeFilter.Add("*");
-        picker.SuggestedStartLocation =
-            Windows.Storage.Pickers.PickerLocationId.Desktop;
-
-        var file = await picker.PickSingleFileAsync();
         if (file is not null)
         {
             ImagePath     = file.Path;
@@ -321,14 +314,7 @@ public partial class FlashPageViewModel : ObservableObject
                 partition,
                 ImagePath,
                 progressReporter,
-                line =>
-                {
-                    App.DispatcherQueue.TryEnqueue(() =>
-                    {
-                        LogText += line + "\n";
-                        OnPropertyChanged(nameof(LogText));
-                    });
-                },
+                AppendLog,
                 _flashCts.Token);
 
             StatusText       = success ? "[OK] 刷写完成" : "[FAIL] 刷写失败";
@@ -361,14 +347,10 @@ public partial class FlashPageViewModel : ObservableObject
 
     /// <summary>
     /// Appends a line to the shared log panel. Marshals onto the UI thread, since
-    /// fastboot output arrives on the stream reader's thread.
+    /// fastboot output arrives on the stream reader's thread. This is also the
+    /// sink <see cref="PatchPageViewModel"/> writes to, so patch and flash lines
+    /// interleave in one buffer.
     /// </summary>
     public void AppendLog(string message)
-    {
-        App.DispatcherQueue.TryEnqueue(() =>
-        {
-            LogText += message + "\n";
-            OnPropertyChanged(nameof(LogText));
-        });
-    }
+        => SailTool.Helpers.LogWriter.Append(() => LogText, t => LogText = t, message);
 }
