@@ -65,8 +65,8 @@ public sealed class FastbootService(
 
     /// <summary>Fetches detailed device information over fastboot or adb.</summary>
     public Task<DetailedDeviceInfo> GetDetailedInfoAsync(
-        string serial, string connectionType, string mode, CancellationToken ct = default)
-        => _deviceDetection.GetDetailedInfoAsync(serial, connectionType, mode, ct);
+        DeviceInfo device, CancellationToken ct = default)
+        => _deviceDetection.GetDetailedInfoAsync(device, ct);
 
     // ══════════════════════════════════════════════════════════════
     //  FLASH

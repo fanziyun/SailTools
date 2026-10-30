@@ -1,3 +1,5 @@
+using SailTool.Enums;
+
 namespace SailTool.Services.Parsing;
 
 /// <summary>
@@ -47,34 +49,40 @@ internal static class DeviceDetailFormatter
     }
 
     /// <summary>
-    /// Translates the <c>ro.boot.verifiedbootstate</c> value into the label the
-    /// detail card shows.
+    /// Normalizes the <c>ro.boot.verifiedbootstate</c> value adb reports into a
+    /// <see cref="BootloaderStatus"/>. An empty or unrecognised value becomes
+    /// <see cref="BootloaderStatus.Unknown"/>, which renders as the placeholder.
     /// </summary>
-    internal static string FormatBlStatus(string raw)
+    /// <remarks>
+    /// The colour semantics are Android Verified Boot's: green means the device
+    /// verifies against the OEM key (locked), orange means it does not verify
+    /// against it (unlocked), yellow means it verifies against a user-supplied
+    /// key, and red means verification failed outright.
+    /// </remarks>
+    internal static BootloaderStatus ParseBlStatus(string raw)
     {
-        if (string.IsNullOrWhiteSpace(raw) || raw == Dash) return Dash;
-        return raw.ToLowerInvariant() switch
+        if (string.IsNullOrWhiteSpace(raw) || raw == Dash) return BootloaderStatus.Unknown;
+        return raw.Trim().ToLowerInvariant() switch
         {
-            "green"  => "未解锁",
-            "orange" => "已解锁",
-            "yellow" => "未解锁 (自定义密钥)",
-            "red"    => "未解锁 (已验证)",
-            _        => raw
+            "green"  => BootloaderStatus.Locked,
+            "orange" => BootloaderStatus.Unlocked,
+            "yellow" => BootloaderStatus.CustomKey,
+            "red"    => BootloaderStatus.Verified,
+            _        => BootloaderStatus.Unknown
         };
     }
 
     /// <summary>
-    /// Translates a bootloader lock state read from <c>fastboot getvar unlocked</c>
-    /// into the same labels <see cref="FormatBlStatus"/> produces.
+    /// Normalizes the <c>unlocked</c> variable from <c>fastboot getvar all</c>.
     /// </summary>
-    /// <param name="hasVar">Whether the <c>unlocked</c> variable was present at all.</param>
+    /// <param name="hasVar">Whether the variable was present at all.</param>
     /// <param name="value">Its raw value when present.</param>
-    internal static string FormatFastbootUnlocked(bool hasVar, string? value)
+    internal static BootloaderStatus ParseFastbootUnlocked(bool hasVar, string? value)
     {
-        if (!hasVar) return Dash;
+        if (!hasVar) return BootloaderStatus.Unknown;
         return value?.Equals("yes", StringComparison.OrdinalIgnoreCase) == true
-            ? "已解锁"
-            : "未解锁";
+            ? BootloaderStatus.Unlocked
+            : BootloaderStatus.Locked;
     }
 
     /// <summary>
@@ -164,40 +172,35 @@ internal static class DeviceDetailFormatter
     }
 
     /// <summary>
-    /// Maps the (connection type, mode) pair onto the short label the UI shows in
-    /// its detection-method column.
+    /// Maps the (connection, mode) pair onto the short label the UI shows in its
+    /// detection-method column.
     /// </summary>
     /// <remarks>
     /// Rules:
     /// <list type="bullet">
     ///   <item>Fastboot connection → <c>Fastboot</c></item>
-    ///   <item>ADB with <c>recovery</c> or <c>sideload</c> → <c>Recovery</c></item>
-    ///   <item>ADB with <c>device</c> → <c>系统</c></item>
-    ///   <item>ADB with <c>unauthorized</c> → <c>未授权</c></item>
-    ///   <item>ADB with <c>offline</c> → <c>离线</c></item>
-    ///   <item>ADB with <c>bootloader</c> → <c>Fastboot</c></item>
+    ///   <item>adb with <c>recovery</c> or <c>sideload</c> → <c>Recovery</c></item>
+    ///   <item>adb with <c>device</c> → <c>系统</c></item>
+    ///   <item>adb with <c>unauthorized</c> → <c>未授权</c></item>
+    ///   <item>adb with <c>offline</c> → <c>离线</c></item>
+    ///   <item>adb with <c>bootloader</c> → <c>Fastboot</c></item>
     /// </list>
     /// </remarks>
-    internal static string MapDetectionType(string connectionType, string mode)
+    internal static string MapDetectionType(ConnectionType connection, AdbMode mode)
     {
-        if (connectionType.StartsWith("Fastboot", StringComparison.OrdinalIgnoreCase))
+        if (connection == ConnectionType.Fastboot)
             return "Fastboot";
 
-        return mode?.ToLowerInvariant() switch
+        return mode switch
         {
-            "recovery"     => "Recovery",
-            "sideload"     => "Recovery",
-            "unauthorized" => "未授权",
-            "offline"      => "离线",
-            "bootloader"   => "Fastboot",
-            _              => "系统"   // default for ADB "device" / unknown
+            AdbMode.Recovery     => "Recovery",
+            AdbMode.Sideload     => "Recovery",
+            AdbMode.Unauthorized => "未授权",
+            AdbMode.Offline      => "离线",
+            AdbMode.Bootloader   => "Fastboot",
+            AdbMode.Fastboot     => "Fastboot",
+            AdbMode.FastbootUsb  => "Fastboot",
+            _                    => "系统"   // AdbMode.Device and anything unknown
         };
     }
-
-    /// <summary>
-    /// Whether <paramref name="connectionType"/> denotes a fastboot connection
-    /// rather than an adb one.
-    /// </summary>
-    internal static bool IsFastbootConnection(string connectionType)
-        => connectionType.StartsWith("Fastboot", StringComparison.OrdinalIgnoreCase);
 }

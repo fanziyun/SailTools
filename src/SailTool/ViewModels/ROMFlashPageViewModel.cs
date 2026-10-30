@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SailTool.Enums;
 using SailTool.Services;
 using Windows.Storage.Pickers;
 
@@ -200,10 +201,10 @@ public partial class ROMFlashPageViewModel(FastbootService fastboot) : Observabl
         if (devices.Count > 1)
             AppendLog($"[提示] 检测到 {devices.Count} 台设备，将使用第一台: {device.Serial}");
 
-        AppendLog($"设备: {device.Serial}  连接方式: {device.ConnectionType}  状态: {device.Mode}");
+        AppendLog($"设备: {device.Serial}  连接方式: {device.ConnectionDisplay}  状态: {device.ModeDisplay}");
 
         // ── 已在 Fastboot 模式：无需重启 ─────────────────────
-        if (device.ConnectionType.Equals("Fastboot", StringComparison.OrdinalIgnoreCase))
+        if (device.Connection == ConnectionType.Fastboot)
         {
             AppendLog("设备已在 Fastboot 模式，准备开始线刷");
             StatusText = "设备就绪，开始线刷";
@@ -211,14 +212,14 @@ public partial class ROMFlashPageViewModel(FastbootService fastboot) : Observabl
         }
 
         // ── ADB 模式：需判断是否可操作 ────────────────────────
-        if (device.Mode.Equals("unauthorized", StringComparison.OrdinalIgnoreCase))
+        if (device.Mode == AdbMode.Unauthorized)
         {
             StatusText = "设备未授权";
             AppendLog("[错误] 设备处于未授权状态，请在手机上允许 USB 调试");
             return false;
         }
 
-        if (device.Mode.Equals("offline", StringComparison.OrdinalIgnoreCase))
+        if (device.Mode == AdbMode.Offline)
         {
             StatusText = "设备离线";
             AppendLog("[错误] 设备处于离线状态，请拔插 USB 后重试");
@@ -233,12 +234,12 @@ public partial class ROMFlashPageViewModel(FastbootService fastboot) : Observabl
             return false;
         }
 
-        var modeLabel = device.Mode.ToLowerInvariant() switch
+        var modeLabel = device.Mode switch
         {
-            "recovery" => "Recovery",
-            "sideload" => "Recovery (sideload)",
-            "device"   => "系统",
-            _          => device.Mode
+            AdbMode.Recovery => "Recovery",
+            AdbMode.Sideload => "Recovery (sideload)",
+            AdbMode.Device   => "系统",
+            _                      => device.ModeDisplay
         };
 
         // ── 重启前向 UI 层请求确认 ─────────────────────────────

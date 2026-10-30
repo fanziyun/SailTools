@@ -222,7 +222,7 @@
                                                    Style="{StaticResource BodyStrongTextBlockStyle}"
                                                    FontSize="13"
                                                    TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Text="{x:Bind ConnectionType}"
+                                        <TextBlock Text="{x:Bind ConnectionDisplay}"
                                                    FontSize="11"
                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                     </StackPanel>

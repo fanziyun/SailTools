@@ -32,16 +32,19 @@ public sealed partial class HomePage : Page
     }
 
     // ── Helper for x:Bind (extracts a property from nullable DetailedDeviceInfo) ──
+    // The field-name literals come from HomePage.xaml; 'ConnectionType' and
+    // 'BootloaderStatus' now read the renamed display properties so the XAML
+    // binding expressions stay byte-identical.
     public string DisplayField(DetailedDeviceInfo? info, string fieldName)
     {
         if (info is null) return "--";
         return fieldName switch
         {
-            "ConnectionType"   => info.ConnectionType,
+            "ConnectionType"   => info.DetectionType,
             "DeviceCodename"   => info.DeviceCodename,
             "Brand"            => info.Brand,
             "Model"            => info.Model,
-            "BootloaderStatus" => info.BootloaderStatus,
+            "BootloaderStatus" => info.BootloaderDisplay,
             "Slot"             => info.Slot,
             "AndroidVersion"   => info.AndroidVersion,
             "SystemVersion"    => info.SystemVersion,
@@ -202,7 +205,7 @@ public sealed partial class HomePage : Page
             SetText(PrimaryStatusLabel,   isFb ? "Fastboot 已连接" : "ADB 已连接");
             SetText(SecondaryStatusLabel, devices.Count > 1
                 ? $"已自动检测到 {devices.Count} 台设备"
-                : $"设备 {primary.Serial} ({primary.ConnectionType})");
+                : $"设备 {primary.Serial} ({primary.ConnectionDisplay})");
         }
         else
         {

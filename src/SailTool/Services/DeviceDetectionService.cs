@@ -1,3 +1,4 @@
+using SailTool.Enums;
 using SailTool.Models;
 using SailTool.Services.Parsing;
 
@@ -81,18 +82,18 @@ public sealed class DeviceDetectionService(FastbootProcessService processService
 
     /// <summary>
     /// Fetches detailed device information, dispatching to fastboot or adb
-    /// depending on <paramref name="connectionType"/>.
+    /// depending on the device's <see cref="DeviceInfo.Connection"/>.
     /// Fields that cannot be read come back as <see cref="DeviceDetailFormatter.Dash"/>.
     /// </summary>
     public async Task<DetailedDeviceInfo> GetDetailedInfoAsync(
-        string serial, string connectionType, string mode, CancellationToken ct = default)
+        DeviceInfo device, CancellationToken ct = default)
     {
         // Compute the user-facing detection type based on connection type + mode
-        var detectionType = DeviceDetailFormatter.MapDetectionType(connectionType, mode);
+        var detectionType = DeviceDetailFormatter.MapDetectionType(device.Connection, device.Mode);
 
-        return DeviceDetailFormatter.IsFastbootConnection(connectionType)
-            ? await GetDetailedFastbootInfoAsync(serial, detectionType, ct)
-            : await GetDetailedAdbInfoAsync(serial, detectionType, ct);
+        return device.Connection == ConnectionType.Fastboot
+            ? await GetDetailedFastbootInfoAsync(device.Serial, detectionType, ct)
+            : await GetDetailedAdbInfoAsync(device.Serial, detectionType, ct);
     }
 
     /// <summary>
@@ -112,7 +113,7 @@ public sealed class DeviceDetectionService(FastbootProcessService processService
                 DeviceCodename   = DeviceDetailFormatter.DisplayOrDash(DeviceDetailFormatter.GetOrEmpty(vars, "product")),
                 Brand            = DeviceDetailFormatter.DisplayOrDash(DeviceDetailFormatter.GetOrEmpty(vars, "brand")),
                 Model            = DeviceDetailFormatter.DisplayOrDash(DeviceDetailFormatter.GetOrEmpty(vars, "model")),
-                BootloaderStatus = DeviceDetailFormatter.FormatFastbootUnlocked(
+                Bootloader       = DeviceDetailFormatter.ParseFastbootUnlocked(
                     vars.TryGetValue("unlocked", out var unlocked), unlocked),
                 Slot             = DeviceDetailFormatter.FormatSlot(DeviceDetailFormatter.GetOrEmpty(vars, "current-slot")),
                 // AndroidVersion can't be retrieved via fastboot on most devices
@@ -169,7 +170,7 @@ public sealed class DeviceDetectionService(FastbootProcessService processService
                 Brand            = DeviceDetailFormatter.DisplayOrDash(brand),
                 Model            = DeviceDetailFormatter.DisplayOrDash(DeviceDetailFormatter.GetOrEmpty(dict, "MODEL")),
                 Slot             = DeviceDetailFormatter.FormatSlot(DeviceDetailFormatter.GetOrEmpty(dict, "SLOT")),
-                BootloaderStatus = DeviceDetailFormatter.FormatBlStatus(DeviceDetailFormatter.GetOrEmpty(dict, "BL")),
+                Bootloader       = DeviceDetailFormatter.ParseBlStatus(DeviceDetailFormatter.GetOrEmpty(dict, "BL")),
                 AndroidVersion   = DeviceDetailFormatter.DisplayOrDash(DeviceDetailFormatter.GetOrEmpty(dict, "ANDROID")),
                 SystemVersion    = DeviceDetailFormatter.DisplayOrDash(
                     DeviceDetailFormatter.FormatSystemVersion(brand, hyperName, hyperIncr, miuiName, displayId)),

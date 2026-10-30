@@ -89,7 +89,7 @@ public sealed partial class HomePageViewModel(FastbootService fastboot) : Observ
                 target = devices[0];
             }
 
-            // 只有目标设备本身发生变化(新引用 / 不同 Serial / Mode/ConnectionType 改变)才赋值
+            // 只有目标设备本身发生变化(新引用 / 不同 Serial / Mode/Connection 改变)才赋值
             if (!DeviceInfoEquals(SelectedDevice, target))
             {
                 SelectedDevice = target;
@@ -98,7 +98,7 @@ public sealed partial class HomePageViewModel(FastbootService fastboot) : Observ
             // StatusDetail 同样只在内容变化时赋值
             var newStatusDetail = devices.Count > 1
                 ? $"已检测到 {devices.Count} 台设备,当前:{target.Serial}"
-                : $"设备 {target.Serial} ({target.ConnectionType})";
+                : $"设备 {target.Serial} ({target.ConnectionDisplay})";
             if (StatusDetail != newStatusDetail)
                 StatusDetail = newStatusDetail;
         }
@@ -111,15 +111,15 @@ public sealed partial class HomePageViewModel(FastbootService fastboot) : Observ
         }
     }
 
-    /// <summary>比较两个设备列表内容是否相等(顺序无关,Serial+Mode+ConnectionType)</summary>
+    /// <summary>比较两个设备列表内容是否相等(顺序无关,Serial+Mode+Connection)</summary>
     private static bool DeviceListsEqual(List<DeviceInfo> a, List<DeviceInfo> b)
     {
         if (a.Count != b.Count) return false;
         for (int i = 0; i < a.Count; i++)
         {
-            if (a[i].Serial         != b[i].Serial         ||
-                a[i].Mode           != b[i].Mode           ||
-                a[i].ConnectionType != b[i].ConnectionType)
+            if (a[i].Serial     != b[i].Serial     ||
+                a[i].Mode       != b[i].Mode       ||
+                a[i].Connection != b[i].Connection)
                 return false;
         }
         return true;
@@ -130,9 +130,9 @@ public sealed partial class HomePageViewModel(FastbootService fastboot) : Observ
     {
         if (a is null && b is null) return true;
         if (a is null || b is null) return false;
-        return a.Serial == b.Serial &&
-               a.Mode   == b.Mode   &&
-               a.ConnectionType == b.ConnectionType;
+        return a.Serial     == b.Serial     &&
+               a.Mode       == b.Mode       &&
+               a.Connection == b.Connection;
     }
 
     // ── 拉取当前选中设备的详细信息 ─────────────────────────────
@@ -142,13 +142,13 @@ public sealed partial class HomePageViewModel(FastbootService fastboot) : Observ
 
         try
         {
-            CurrentDetailedDevice = await fastboot.GetDetailedInfoAsync(
-                device.Serial, device.ConnectionType, device.Mode);
+            CurrentDetailedDevice = await fastboot.GetDetailedInfoAsync(device);
         }
         catch
         {
-            CurrentDetailedDevice = DetailedDeviceInfo.Empty(
-                device.Serial, device.ConnectionType);
+            // Fallback keeps the old behaviour: DetectionType shows the raw
+            // connection ("Fastboot" / "ADB") when detail collection threw.
+            CurrentDetailedDevice = DetailedDeviceInfo.Empty(device.Serial, device.ConnectionDisplay);
         }
     }
 

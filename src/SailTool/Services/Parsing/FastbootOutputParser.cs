@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using SailTool.Enums;
 using SailTool.Models;
 
 namespace SailTool.Services.Parsing;
@@ -145,13 +146,18 @@ internal static partial class FastbootOutputParser
         foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
         {
             var match = DeviceLineRegex().Match(line);
-            if (match.Success)
-            {
-                devices.Add(new DeviceInfo(
-                    Serial:         match.Groups[1].Value.Trim(),
-                    Mode:           match.Groups[2].Value.Trim(),
-                    ConnectionType: "Fastboot"));
-            }
+            if (!match.Success) continue;
+
+            // The regex already restricts this to fastboot / fastboot_usb, but go
+            // through the parser anyway so an unexpected value degrades to a skip
+            // instead of silently becoming Fastboot.
+            var mode = AdbModeExtensions.FromWireText(match.Groups[2].Value);
+            if (mode is null) continue;
+
+            devices.Add(new DeviceInfo(
+                Serial:     match.Groups[1].Value.Trim(),
+                Mode:       mode.Value,
+                Connection: ConnectionType.Fastboot));
         }
 
         return devices;
@@ -181,13 +187,15 @@ internal static partial class FastbootOutputParser
             }
 
             var match = AdbDeviceLineRegex().Match(line);
-            if (match.Success)
-            {
-                devices.Add(new DeviceInfo(
-                    Serial:         match.Groups[1].Value.Trim(),
-                    Mode:           match.Groups[2].Value.Trim(),
-                    ConnectionType: "ADB"));
-            }
+            if (!match.Success) continue;
+
+            var mode = AdbModeExtensions.FromWireText(match.Groups[2].Value);
+            if (mode is null) continue;
+
+            devices.Add(new DeviceInfo(
+                Serial:     match.Groups[1].Value.Trim(),
+                Mode:       mode.Value,
+                Connection: ConnectionType.ADB));
         }
 
         return devices;
