@@ -88,7 +88,8 @@ public sealed partial class ROMFlashPage : Page
         }
     }
 
-    /// <summary>根据 IsFlashing 统一刷新按钮/转圈状态（PropertyChanged 和 RestoreUiState 共用）</summary>
+    /// <summary>Refreshes button and spinner state from IsFlashing in one place, shared by
+    /// PropertyChanged and RestoreUiState.</summary>
     private void ApplyFlashingState(bool isFlashing)
     {
         var hasBat = ViewModel.HasFlashAll
@@ -179,7 +180,8 @@ public sealed partial class ROMFlashPage : Page
 
     // ── 页面切换后恢复 UI 状态 ─────────────────────────────────
 
-    /// <summary>页面切换后恢复 UI 状态（ViewModel 已缓存，新 Page 实例需要重新渲染）</summary>
+    /// <summary>Restores UI state after navigating back to this page: the ViewModel is
+    /// cached, but a new Page instance has to render it again.</summary>
     private void RestoreUiState()
     {
         // 路径

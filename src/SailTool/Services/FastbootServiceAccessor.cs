@@ -11,7 +11,8 @@ namespace SailTool.Services;
 /// <see cref="FastbootProcessService"/> owns the child processes,
 /// <see cref="DeviceDetectionService"/> reads device state through it, and
 /// <see cref="FastbootService"/> re-exposes both while adding flashing.
-/// ViewModel 实例被缓存：切页面不丢状态，重启自动清空。
+/// ViewModel instances are cached, so state survives navigating between pages
+/// and is dropped on restart.
 /// </remarks>
 internal static class FastbootServiceAccessor
 {

@@ -18,7 +18,7 @@ namespace SailTool.Models;
 /// </para>
 /// <para>
 /// <see cref="DetectionType"/> stays a string: it is a short user-facing label
-/// ("Fastboot", "Recovery", "系统", "未授权", "离线") computed by
+/// (one of five, already localized) computed by
 /// <c>DeviceDetailFormatter.MapDetectionType</c> from connection and mode, and it
 /// has no closed vocabulary of its own.
 /// </para>

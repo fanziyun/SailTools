@@ -170,19 +170,20 @@ public sealed partial class HomePage : Page
     private static readonly Color BlueBg  = Color.FromArgb(0x30, 0x21, 0x96, 0xF3);
     private static readonly Color RedBg   = Color.FromArgb(0x30, 0xFF, 0x52, 0x52);
 
-    /// <summary>仅当 TextBlock.Text 实际变化时才赋值,避免重复渲染导致闪烁</summary>
+    /// <summary>Assigns TextBlock.Text only when it actually changes, so repeated renders
+    /// do not flicker.</summary>
     private static void SetText(TextBlock tb, string text)
     {
         if (tb.Text != text) tb.Text = text;
     }
 
-    /// <summary>仅当 SolidColorBrush.Color 实际变化时才赋值</summary>
+    /// <summary>Assigns SolidColorBrush.Color only when it actually changes.</summary>
     private static void SetColor(SolidColorBrush brush, Color color)
     {
         if (brush.Color != color) brush.Color = color;
     }
 
-    /// <summary>仅当 Visibility 实际变化时才赋值</summary>
+    /// <summary>Assigns Visibility only when it actually changes.</summary>
     private static void SetVisibility(UIElement el, Visibility visibility)
     {
         if (el.Visibility != visibility) el.Visibility = visibility;

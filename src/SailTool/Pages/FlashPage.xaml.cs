@@ -11,8 +11,9 @@ public sealed partial class FlashPage : Page
     private readonly DispatcherTimer _autoRefreshTimer;
 
     /// <summary>
-    /// 当从「一键修补」卡片点击「刷入修补后的镜像」触发刷写时为 true。
-    /// 此时进度条和状态都显示在一键修补卡片内，而不是下方自定义刷入卡片。
+    /// True while a flash was started from the one-click patch card, by clicking
+    /// "flash the patched image". Progress and status then render inside that card
+    /// rather than in the custom-flash card below.
     /// </summary>
     private bool _isPatchFlowActive;
 
@@ -172,8 +173,9 @@ public sealed partial class FlashPage : Page
     }
 
     /// <summary>
-    /// 根据 ViewModel 的 FlashProgress / HasExactProgress 同步两套进度 UI。
-    /// patch-flow 激活时只更新一键修补卡片内的进度，跳过自定义刷入卡片。
+    /// Syncs both progress UIs from the ViewModel's FlashProgress / HasExactProgress.
+    /// While a patch flow is active only the patch card is updated and the
+    /// custom-flash card is skipped.
     /// </summary>
     private void UpdateProgressUi()
     {
@@ -440,7 +442,8 @@ public sealed partial class FlashPage : Page
         }
     }
 
-    /// <summary>页面加载时从 ViewModel 恢复 UI 标签（VS 重建后标签会丢失但 ViewModel 缓存还在）</summary>
+    /// <summary>Restores the UI labels from the ViewModel on page load: the labels are lost
+    /// when the page is rebuilt, while the cached ViewModel still holds them.</summary>
     private void RestoreUiState()
     {
         // 快速刷入 — 镜像路径

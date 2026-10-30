@@ -38,8 +38,8 @@ public sealed partial class ToolsPageViewModel(FastbootService fastboot) : Obser
     public partial bool IsRunning { get; set; }
 
     /// <summary>
-    /// UI 层注入的确认解锁回调。
-    /// 参数为标题和内容，返回值表示用户是否确认。
+    /// Unlock confirmation callback, injected by the UI layer.
+    /// Receives a title and a body, and returns whether the user confirmed.
     /// </summary>
     public Func<string, string, Task<bool>>? ConfirmAsync { get; set; }
 
@@ -127,10 +127,10 @@ public sealed partial class ToolsPageViewModel(FastbootService fastboot) : Obser
     }
 
     /// <summary>
-    /// 一键宽容模式：依次执行
-    ///   1. oem set-gpu-preemption 0 androidboot.selinux=permissive
-    ///   2. continue
-    /// 第一条失败则终止（避免设备在未设置好时直接重启）。
+    /// One-click permissive mode. Runs two fastboot commands in order —
+    /// <c>oem set-gpu-preemption 0 androidboot.selinux=permissive</c>, then
+    /// <c>continue</c> — and aborts if the first one fails, so the device is never
+    /// rebooted before the setting has actually been applied.
     /// </summary>
     public async Task OnPermissiveModeAsync()
     {

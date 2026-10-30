@@ -271,7 +271,8 @@ public partial class PatchPageViewModel(FastbootService fastboot) : ObservableOb
         }
     }
 
-    /// <summary>修补刷入完成后，用户确认重启到系统时调用</summary>
+    /// <summary>Called when the user confirms rebooting into the system after the
+    /// patched image has been flashed.</summary>
     [RelayCommand]
     private async Task RebootToSystemAsync()
     {

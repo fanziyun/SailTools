@@ -7,7 +7,7 @@ namespace SailTool.Enums;
 internal static class BootloaderStatusExtensions
 {
     /// <summary>
-    /// The label rendered in the BL 状态 column. These strings are user-visible
+    /// The label rendered in the bootloader-status column. These strings are user-visible
     /// and are unchanged from before the enum existed.
     /// </summary>
     internal static string ToDisplayText(this BootloaderStatus status) => status switch

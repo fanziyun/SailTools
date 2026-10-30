@@ -58,7 +58,7 @@ public partial class App : Application
 
     // ── Theme management ──────────────────────────────────────────
 
-    /// <summary>读取上次保存的主题设置</summary>
+    /// <summary>Reads the theme setting saved by the previous run.</summary>
     public static ElementTheme GetSavedTheme()
     {
         try
@@ -82,7 +82,7 @@ public partial class App : Application
         return ElementTheme.Default;
     }
 
-    /// <summary>应用主题并持久化到本地存储</summary>
+    /// <summary>Applies the theme and persists it to local storage.</summary>
     public static void ApplyTheme(ElementTheme theme)
     {
         ApplyThemeInternal(theme);

@@ -13,8 +13,9 @@ public partial class ROMFlashPageViewModel(FastbootService fastboot) : Observabl
     private CancellationTokenSource? _flashCts;
 
     /// <summary>
-    /// UI 层注入的重启确认回调。
-    /// 参数为设备当前模式描述（如"系统"、"Recovery"），返回值表示用户是否确认。
+    /// Reboot confirmation callback, injected by the UI layer.
+    /// Receives a description of the device's current mode (for example "system" or
+    /// "Recovery", already localized) and returns whether the user confirmed.
     /// </summary>
     public Func<string, Task<bool>>? ConfirmRebootAsync { get; set; }
 
@@ -35,7 +36,8 @@ public partial class ROMFlashPageViewModel(FastbootService fastboot) : Observabl
     [ObservableProperty]
     public partial bool HasFlashLock { get; set; }
 
-    /// <summary>当前选中的 bat 文件名（对应 RadioButton 的 GroupName 逻辑）</summary>
+    /// <summary>Name of the currently selected bat file, which is what the RadioButton
+    /// group reflects.</summary>
     [ObservableProperty]
     public partial string SelectedBatFile { get; set; } = "flash_all.bat";
 
@@ -179,7 +181,7 @@ public partial class ROMFlashPageViewModel(FastbootService fastboot) : Observabl
     //  阶段 1：检测设备 → 必要时重启到 Bootloader → 等待 Fastboot
     // ══════════════════════════════════════════════════════════════
 
-    /// <returns>true = 设备已在 Fastboot 模式，可以执行脚本</returns>
+    /// <returns>true once the device is in fastboot mode and the script can run.</returns>
     private async Task<bool> PrepareDeviceForFlashAsync(CancellationToken ct)
     {
         StatusText = "正在检测设备...";

@@ -101,15 +101,16 @@ public partial class FlashPageViewModel : ObservableObject
     [ObservableProperty]
     public partial string SelectedPartition { get; set; } = "boot";
 
-    /// <summary>是否使用自定义分区（true = 用 CustomPartitionName，false = 用 SelectedPartition）</summary>
+    /// <summary>Whether to flash a hand-typed partition: true uses CustomPartitionName,
+    /// false uses SelectedPartition.</summary>
     [ObservableProperty]
     public partial bool UseCustomPartition { get; set; }
 
-    /// <summary>用户手动输入的自定义分区名</summary>
+    /// <summary>The partition name the user typed in.</summary>
     [ObservableProperty]
     public partial string CustomPartitionName { get; set; } = string.Empty;
 
-    /// <summary>当前生效的分区名（FlashAsync 使用此属性）</summary>
+    /// <summary>The partition name currently in effect; FlashAsync reads this.</summary>
     public string ActivePartition =>
         UseCustomPartition ? CustomPartitionName.Trim() : SelectedPartition;
 
@@ -160,16 +161,19 @@ public partial class FlashPageViewModel : ObservableObject
         => await RefreshDevicesCoreAsync(silent: false);
 
     /// <summary>
-    /// 供定时器和外部调用的自动刷新入口。
-    /// silent=true：不弹提示、不覆盖用户已选设备、不显示刷新中动画。
+    /// Entry point for the timer and other callers to refresh automatically.
+    /// With silent=true: no message is shown, the device the user selected is not
+    /// overridden, and no spinner appears.
     /// </summary>
     public async Task AutoRefreshAsync()
         => await RefreshDevicesCoreAsync(silent: true);
 
-    /// <summary>核心刷新逻辑。</summary>
+    /// <summary>The refresh logic both entry points share.</summary>
     /// <param name="silent">
-    /// true  = 静默模式（自动刷新）：不显示刷新动画、不覆盖用户已选设备、不附加 raw 输出。
-    /// false = 显式模式（手动点刷新）：完整反馈 + 自动选首台设备 + 显示 raw 输出诊断。
+    /// true  = silent, i.e. the automatic poll: no spinner, the selected device is left
+    ///         alone, and raw output is not attached.
+    /// false = explicit, i.e. the user clicked refresh: full feedback, the first device
+    ///         is selected automatically, and raw output is shown for diagnosis.
     /// </param>
     private async Task RefreshDevicesCoreAsync(bool silent)
     {

@@ -180,9 +180,9 @@ internal static class DeviceDetailFormatter
     /// <list type="bullet">
     ///   <item>Fastboot connection → <c>Fastboot</c></item>
     ///   <item>adb with <c>recovery</c> or <c>sideload</c> → <c>Recovery</c></item>
-    ///   <item>adb with <c>device</c> → <c>系统</c></item>
-    ///   <item>adb with <c>unauthorized</c> → <c>未授权</c></item>
-    ///   <item>adb with <c>offline</c> → <c>离线</c></item>
+    ///   <item>adb with <c>device</c> → the localized "system" label</item>
+    ///   <item>adb with <c>unauthorized</c> → the localized "not authorized" label</item>
+    ///   <item>adb with <c>offline</c> → the localized "offline" label</item>
     ///   <item>adb with <c>bootloader</c> → <c>Fastboot</c></item>
     /// </list>
     /// </remarks>

@@ -4,7 +4,7 @@ using System.IO.Compression;
 namespace SailTool.Services;
 
 /// <summary>
-/// 修补 boot 镜像的核心服务，支持 Magisk 和 AK3
+/// Core service for patching a boot image, supporting both Magisk and AK3.
 /// </summary>
 public class PatchService
 {
@@ -42,14 +42,14 @@ public class PatchService
     public string MagiskBootPath => _magiskbootPath;
 
     /// <summary>
-    /// 自动检测工具类型并修补 boot 镜像
+    /// Detects the tool type automatically and patches the boot image.
     /// </summary>
-    /// <param name="toolPath">Magisk APK 或 AK3 ZIP 路径</param>
-    /// <param name="bootImagePath">原始 boot.img 路径</param>
-    /// <param name="outputDir">输出目录</param>
-    /// <param name="log">日志回调</param>
-    /// <param name="ct">取消令牌</param>
-    /// <returns>修补后的镜像路径</returns>
+    /// <param name="toolPath">Path to the Magisk APK or the AK3 ZIP.</param>
+    /// <param name="bootImagePath">Path to the original boot.img.</param>
+    /// <param name="outputDir">Directory the patched image is written to.</param>
+    /// <param name="log">Callback receiving one log line at a time.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Path to the patched image.</returns>
     public async Task<string> PatchBootImageAsync(
         string toolPath,
         string bootImagePath,
@@ -305,7 +305,8 @@ public class PatchService
     }
 
     /// <summary>
-    /// 查找 AK3 源目录。如果外层有 anykernel.sh 直接返回，否则搜索内层 zip。
+    /// Locates the AK3 source directory. If anykernel.sh sits at the outer level that
+    /// directory is returned directly; otherwise the inner zips are searched.
     /// </summary>
     private static string FindAk3SourceDir(string extractDir, Action<string> log)
     {
@@ -342,7 +343,7 @@ public class PatchService
     }
 
     /// <summary>
-    /// 在 AK3 目录中查找 kernel 文件
+    /// Finds the kernel file inside an AK3 directory.
     /// </summary>
     private static string? FindKernelFile(string ak3Dir)
     {
@@ -408,7 +409,8 @@ public class PatchService
     }
 
     /// <summary>
-    /// 清理旧目录后重建，防止残留文件干扰 magiskboot（如之前的 kernel 文件）
+    /// Removes and recreates the directory, because leftovers such as a kernel file
+    /// from the previous run would confuse magiskboot.
     /// </summary>
     private static string CleanCreateDir(string dir)
     {

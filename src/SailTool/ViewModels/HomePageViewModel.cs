@@ -19,9 +19,9 @@ public sealed partial class HomePageViewModel(FastbootService fastboot) : Observ
     public partial List<DeviceInfo> Devices { get; set; } = [];
 
     /// <summary>
-    /// 用户当前选中的设备（ListView TwoWay 绑定）。
-    /// 社区工具包会自动生成 <c>OnSelectedDeviceChanged</c> partial 方法,
-    /// 在属性赋值完成后回调,用于触发详细信息异步刷新。
+    /// The device the user currently has selected (TwoWay bound from the list).
+    /// The MVVM toolkit generates an <c>OnSelectedDeviceChanged</c> partial method,
+    /// called after assignment, which kicks off the asynchronous detail refresh.
     /// </summary>
     [ObservableProperty]
     public partial DeviceInfo? SelectedDevice { get; set; }
@@ -111,7 +111,7 @@ public sealed partial class HomePageViewModel(FastbootService fastboot) : Observ
         }
     }
 
-    /// <summary>比较两个设备列表内容是否相等(顺序无关,Serial+Mode+Connection)</summary>
+    /// <summary>Compares two device lists by content, on Serial, Mode and Connection.</summary>
     private static bool DeviceListsEqual(List<DeviceInfo> a, List<DeviceInfo> b)
     {
         if (a.Count != b.Count) return false;
@@ -125,7 +125,7 @@ public sealed partial class HomePageViewModel(FastbootService fastboot) : Observ
         return true;
     }
 
-    /// <summary>判断两个设备引用是否代表同一设备且信息一致</summary>
+    /// <summary>Whether two references describe the same device in the same state.</summary>
     private static bool DeviceInfoEquals(DeviceInfo? a, DeviceInfo? b)
     {
         if (a is null && b is null) return true;
