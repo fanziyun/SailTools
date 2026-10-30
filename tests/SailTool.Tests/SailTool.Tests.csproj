@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Must match the app's TFM: the test host loads SailTool.dll, whose
+         reference assemblies are Windows-specific. -->
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <!-- RuntimeIdentifier is a global property, so it flows into the referenced
+         project too. Leaving it unset here would make SailTool build for
+         win-arm64 on an ARM host while the test host ran win-x64. -->
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
+    <Platforms>x64</Platforms>
+
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>14</LangVersion>
+
+    <!-- The app's WinRT AOT optimizer is disabled for the same source-generator
+         bug documented in SailTool.csproj; the reference alone would not pull it
+         in, but this project has no reason to enable it either. -->
+    <CsWinRTAotOptimizerEnabled>false</CsWinRTAotOptimizerEnabled>
+
+    <!-- Only the parsing layer and FlashProgressTracker are reachable, via the
+         InternalsVisibleTo in SailTool.csproj. Nothing here starts the app, so no
+         DispatcherQueue and no XAML types are ever loaded. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SailTool\SailTool.csproj" />
+  </ItemGroup>
+
+</Project>

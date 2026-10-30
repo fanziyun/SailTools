@@ -42,14 +42,47 @@ internal static partial class FastbootOutputParser
     /// Matches an <c>adb devices</c> line: <c>"1a2b3c4d    device"</c>.
     /// The six states adb can report are enumerated in the alternation.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Known gap.</strong> The serial class <c>[A-Za-z0-9_-]+</c> has no
+    /// dot and no colon, so a device connected over <c>adb tcpip</c> — reported as
+    /// <c>"192.168.1.50:5555    device"</c> — does not match and never reaches the
+    /// device list. USB serials, including ones with dashes and underscores, and
+    /// the <c>emulator-5554</c> form are unaffected.
+    /// </para>
+    /// <para>
+    /// Left as-is deliberately: widening the class changes which devices the app
+    /// offers to flash, which is a behaviour change rather than a refactor.
+    /// <c>FastbootOutputParserTests</c> pins the current behaviour so the gap does
+    /// not become silent.
+    /// </para>
+    /// </remarks>
     [GeneratedRegex(@"^([A-Za-z0-9_-]+)\s+(device|recovery|bootloader|sideload|unauthorized|offline)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase)]
     internal static partial Regex AdbDeviceLineRegex();
 
     /// <summary>
-    /// Matches an explicit percentage pushed by the bootloader itself, as in
-    /// <c>"(bootloader) 5%"</c>. Only some devices emit this.
+    /// Matches a percentage that arrives with an immediately preceding open
+    /// paren, as in <c>"(45%"</c>.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Known gap.</strong> The intent here is to catch a bootloader that
+    /// pushes its own percentage, and fastboot relays bootloader INFO text with the
+    /// format <c>"(bootloader) %s"</c> — the only bootloader-line format string in
+    /// the shipped binary. A bootloader sending <c>"5%"</c> therefore arrives as
+    /// <c>"(bootloader) 5%"</c>, which this pattern does <em>not</em> match: there
+    /// is text between the paren and the digits. Such a device shows an
+    /// indeterminate bar for the whole transfer.
+    /// </para>
+    /// <para>
+    /// Verified by extracting every printable string from
+    /// <c>tools/platform-tools/fastboot.exe</c>. Left as-is deliberately: widening
+    /// it changes what the progress bar does on real hardware, which is a behaviour
+    /// change, not a refactor. <c>FlashProgressTrackerTests</c> pins both the
+    /// matched form and this unmatched one so the gap stays visible.
+    /// </para>
+    /// </remarks>
     [GeneratedRegex(
         @"\((\d{1,3})%",
         RegexOptions.Compiled | RegexOptions.IgnoreCase)]
