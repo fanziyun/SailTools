@@ -56,6 +56,35 @@ Never copy these binaries into `bin/`. An earlier version of the packaging scrip
 copied `platform-tools` from a gitignored Debug output tree, so `dotnet clean`
 destroyed the only copy.
 
+**Installing over a running session fails with error 5.** Inno cannot delete
+`platform-tools\AdbWinApi.dll` while an `adb.exe` or `fastboot.exe` from the
+previous run still has it loaded, and the installer then aborts mid-copy. Stop
+those processes (`Get-Process adb,fastboot | Stop-Process -Force`) before
+reinstalling. Both have been hit in practice; a flashed device leaves a `fastboot`
+waiting on the USB endpoint long after the app is gone.
+
+**`fastboot.exe` is not Google's signed build.** It is our own build of AOSP
+fastboot 36.0.0 carrying MeowArch's progress bar, and it is unsigned; everything
+else in that directory is the signed Google Platform-Tools 37.0.1. It is not
+reproducible here without MSYS2's mingw-w64 i686 toolchain and an AOSP partial
+checkout — read `tools/platform-tools/PROVENANCE.md` before touching any of it.
+That file records the exact upstream commits, our four source patches (the
+`FORCE_PROGRESS` switch, the MSYS2 binutils fix, the 1 MiB sparse chunking and the
+denser pipe cadence), the verified behaviour matrix, and the GPL-3.0 obligation
+distribution creates.
+
+The binary draws its bar only when stderr is a terminal, and this app always reads
+through a pipe, so both launch sites set `FORCE_PROGRESS=1` on the child
+(`FastbootService.FlashImageAsync`, `ROMFlashPageViewModel.ExecuteBatAsync`; the
+latter's `cmd.exe` passes it down to every `fastboot flash` inside an OEM script).
+Without it a flash is silent and the percent bar never moves.
+
+Keep `AdbWinApi.dll` as the signed Google one. Our fastboot imports 12 functions
+from it (`AdbEnumInterfaces`, `AdbCreateInterfaceByName`, `AdbReadEndpointSync`, …)
+and the signed DLL exports all 12; both DLL versions export the same 79 functions
+at FileVersion 2.0.0.0. So exactly one file in the directory is unsigned, and
+swapping the vendor's unsigned DLL in would make it three.
+
 **`<Version>` in `SailTool.csproj` is the single product version.** The packaging
 script parses it and passes it to ISCC as `/DMyAppVersion`. `InformationalVersion`
 is set explicitly because an explicit `<Version>` overrides the
@@ -107,27 +136,131 @@ test host, so `Helpers/LogWriter` and the ViewModels cannot be exercised there;
 that is why the parsing and the progress state machine were extracted as pure
 classes.
 
+## Progress reporting
+
+The shipped `fastboot.exe` draws a transfer progress bar and Google's builds do
+not, so there are two code paths and the UI has to say which one it is on. The bar
+is off by default when stderr is a pipe — which is always, here — so the launch
+sites also set `FORCE_PROGRESS=1`.
+
+`FastbootCapability.SupportsTransferProgress(path)` decides by scanning the binary
+for ASCII needles: `%3d%%` (the bar's percentage format) or `(%.1f%%)` (the
+previous binary's transfer-line format). Any hit means progress is available. That
+is a property of the build, not something the stream reveals.
+`FastbootService.SupportsTransferProgress` exposes it and `FlashPageViewModel`
+writes a hint line into the log panel when it is false.
+
+The hint goes to the log, not to a new control. The page layout is deliberately
+untouched: everything the user sees during a flash uses the percent bar and the
+speed label that were already there. What changed is what those two now report and
+what the log panel prints.
+
+The log panel keeps a transfer on **one line**: a progress frame overwrites the
+previous frame instead of being appended, so the panel shows 0% → 100% in place
+rather than thousands of lines. That is `LogBuffer` (pure string surgery) plus
+`LogWriter.AppendProgress`, and the two call sites decide frame-vs-message with
+`FastbootOutputParser.IsProgressLine`. The decision to overwrite is taken from the
+buffer's own last line, on the UI thread, because stdout and stderr are two
+readers on two threads — a flag maintained by the callers would race.
+
+The stored frame is **not** the raw frame: `FastbootOutputParser.RemoveProgressBar`
+drops the `[####>----]` graphic and the padding in front of it, because the page
+already has a real progress bar above the log and the drawn one is the same
+information a second time. That is why `IsProgressLine` also matches
+`StrippedBarFrameRegex` (`NN%  …MiB/…MiB` with no bar) — the buffer classifies
+its own stored text, and a stripped frame that stopped classifying would append
+again and bring the flood back. The speed is likewise printed once, on the label
+to the right of the bar; `StatusText` carries only `正在刷写...`, so a narrow
+window never truncates a number that is already on screen.
+
+What the log gate samples is exactly what the binary redraws: bar frames, the old
+transfer lines, and sparse chunk headers. Two lines are deliberately never
+sampled. A **result** line is not, even when it parses as the frame it was
+appended to — fastboot writes `OKAY` onto the line it was drawing on, so
+`Sending 'boot' (19531 KB)   OKAY [  1.272s]` and the sparse
+`... 13/13 (262040 KB)   OKAY` both match a progress pattern, and dropping either
+hides the line that says the transfer worked. The **100% frame** is not, because
+it is where the one log line comes to rest and it arrives tens of milliseconds
+after the last sampled frame (98%→100% at 40 MiB/s is ~70 ms). Both were real
+regressions once, and both are pinned in `FastbootBarProgressTests`.
+
+The pipeline for one flash is:
+
+```
+child process streams
+  → FastbootProcessService.ReadStreamLinesAsync   splits on \r AND \n, decodes via StreamReader
+  → ProgressLogGate.ShouldLog                     samples progress lines for the log panel
+    → LogWriter.Append / AppendProgress           append a message, or overwrite the frame
+  → FlashProgressTracker.HandleLine               state machine, monotonic cursors
+  → ProgressThrottle.ShouldRender                 samples updates for the progress bar
+  → FlashPageViewModel progressReporter           DispatcherQueue hop, then the XAML labels
+```
+
+Both gates are 100 ms, drop identical repeats, and pass terminal states straight
+through. They are separate objects because they gate different things: the log
+gates *lines*, the throttle gates *progress updates*, and the tracker must still
+see every line or its cursors lose data.
+
+The 100 ms figure and the "drop unchanged state" rule are a product decision from
+the owner, not a tuned constant — do not retune them without asking. It was 300 ms
+until 2026-11-01; at that spacing a 40 MiB/s transfer visibly stepped.
+
+Two of our patches to fastboot exist for that 100 ms window, and removing either
+brings the stutter back. `SparseWriteCallback` sends a sparse download in 1 MiB
+pieces instead of one `SendBuffer` per sparse span — a span runs to tens of MiB and
+the progress callback hangs off `SendBuffer`, so the bar stood still for a second
+and then jumped. And with `FORCE_PROGRESS=1` the bar's own cadence drops from
+80 ms/`total÷400` to 25 ms/`total÷2000`, because an 80 ms source sampled at 100 ms
+beats into uneven 80/160 ms gaps — two clocks that are nearly, but not exactly,
+in step. Measured with the TCP mock at 15 MB/s: 67 ms gaps on both paths, 97 frames
+for a 100 MiB sparse flash that used to emit 8.
+
+`ROMFlashPageViewModel.ExecuteBatAsync` reuses `ReadStreamLinesAsync` and
+`ProgressLogGate` but not the tracker. It injects `platform-tools` into the child
+`PATH`, so every `fastboot flash` inside an OEM script emits progress lines too —
+reading it with `BeginOutputReadLine` would buffer the whole transfer and then dump
+thousands of lines at once.
+
+Two things that look wrong but are deliberate:
+
+- The transfer-progress pattern's partition group is `.+?`, not `[^:]+?`. A lazy
+  character class cannot span the colon in `vendor_boot:RAMDISK`; backtracking past
+  it is what makes that target work.
+- `ProgressPercentRegex` tolerates whitespace inside the parens even though the
+  recorded sample output has none — the size field before it is right-aligned
+  (`recovery:   5.0 MB` vs `recovery: 100.0 MB`), the percentage is not. The `\s*`
+  is defensive, not a claim about this binary.
+- `FlashProgressTracker` clears the native rate only when the `Sending` header's
+  partition-and-size changes, not on every `Sending` match. Every bar frame repeats
+  that prolog, so clearing unconditionally would wipe the rate immediately after
+  each frame that carried one, and the speed label would flicker.
+
 ## Known defects — documented and pinned, not fixed
 
-Two real pre-existing bugs are recorded in the XML docs on their patterns in
-`Services/Parsing/FastbootOutputParser.cs`, each with a test asserting the current
-behaviour so the gap stays visible:
+`AdbDeviceLineRegex`'s serial class `[A-Za-z0-9_-]+` excludes dots and colons, so a
+device over `adb tcpip` (`192.168.1.50:5555`) never reaches the list. USB serials,
+including ones with dashes and underscores, and the `emulator-5554` form are fine.
+The pattern's XML doc records this and `FastbootOutputParserTests` pins it. Widening
+the class changes which devices the app offers to flash, so it needs an explicit
+decision and a device to test against.
 
-1. `ProgressPercentRegex` is `\((\d{1,3})%`, but fastboot relays bootloader INFO
-   text as `(bootloader) %s` — verified as the only such format string in the
-   shipped binary. A bootloader pushing `5%` arrives as `(bootloader) 5%` and does
-   not match, so the bar stays indeterminate on devices that do report progress.
-2. `AdbDeviceLineRegex`'s serial class `[A-Za-z0-9_-]+` excludes dots and colons,
-   so a device over `adb tcpip` (`192.168.1.50:5555`) never reaches the list.
-
-Fixing either changes behaviour on real hardware. That needs an explicit decision
-and a hardware test, not a drive-by edit. Same for
-`FastbootOutputParser.ProgressSpeedRegex`: stock fastboot emits no percentage and
-no rate (verified by string-extracting both Platform-Tools 37.0.0 and 37.0.1), so
-that branch is dormant and exists for vendor builds.
+A bootloader percentage pushed as `(bootloader) 47%` is now parsed — it was not
+before, and the old doc claimed it was. That was a genuine bug, fixed along with
+the progress work.
 
 `ROMFlashPageViewModel.ExecuteBatAsync` builds its own `Process` instead of going
-through `FastbootProcessService`. Left alone deliberately.
+through `FastbootProcessService`. It shares the stream reader and the log gate, so
+the remaining divergence is process lifetime and cancellation, not parsing.
+
+The 线刷 page has a percentage bar that never moves. `OverallProgress` is declared
+and reset to 0 at the start of a flash but never advanced anywhere, so
+`HasExactProgress` stays false and `ROMFlashPage.xaml.cs` shows the indeterminate
+ring for the whole run. This predates the progress work — the page has never
+reported a percentage. Implementing it means the appendix-A approach: pre-scan the
+OEM script for every `fastboot flash <part> <img>`, sum the image sizes, then
+accumulate per partition as progress lines name them. That needs a decision about
+how to handle scripts whose partition list is not knowable up front, and about
+whether to show a total-GB figure the user cannot verify.
 
 ## Language conventions
 
