@@ -62,16 +62,13 @@
                 </NavigationViewItem>
             </NavigationView.MenuItems>
 
-            <Frame x:Name="ContentFrame" Padding="20,12,24,16" />
+            <!-- 分隔线是内容区自己的左边框，不是窗口上按固定边距摆放的覆盖层。
+                 内容列的位置由面板决定，面板折叠时内容列跟着左移，线也跟着走；
+                 早先把它写成 Margin="280" 的覆盖层，面板一收就留在原地。 -->
+            <Border BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                    BorderThickness="1,0,0,0">
+                <Frame x:Name="ContentFrame" Padding="20,12,24,16" />
+            </Border>
         </NavigationView>
-
-        <!-- Vertical divider (overlay) between sidebar and content -->
-        <Border Grid.Row="1"
-                Width="1"
-                HorizontalAlignment="Left"
-                VerticalAlignment="Stretch"
-                Margin="280,0,0,0"
-                IsHitTestVisible="False"
-                Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
     </Grid>
 </Window>
