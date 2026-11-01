@@ -131,6 +131,12 @@ public partial class FlashPageViewModel : ObservableObject
     /// Transfer speed text for display, e.g. "37.05 MB/s".
     /// Empty when speed is not available (old fastboot or completed).
     /// </summary>
+    /// <remarks>
+    /// Bound to the existing SpeedLabel. With the progress-capable fastboot now
+    /// shipped, this carries the instantaneous USB rate the tool reports rather than
+    /// the average derived from OKAY timing — same control, same binding, better
+    /// number.
+    /// </remarks>
     [ObservableProperty]
     public partial string FlashSpeedText { get; set; } = "";
 
@@ -288,11 +294,20 @@ public partial class FlashPageViewModel : ObservableObject
 
         try
         {
+            // 能力提示走日志面板，不动界面布局：这份 fastboot 能不能报进度是
+            // 用户排障时真正需要的信息，而它属于输出而不是控件。
+            if (!_fastboot.SupportsTransferProgress)
+                AppendLog("[提示] 当前 fastboot 不支持进度上报，将显示不定进度条与由耗时推算的平均速度");
+
+            // FastbootService already rate-limits these callbacks (ProgressThrottle:
+            // 100ms, identical updates dropped, terminal states passed through), so
+            // this handler runs at UI pace rather than at the rate fastboot emits
+            // frames (25ms or so under FORCE_PROGRESS).
             Action<FlashProgressInfo> progressReporter = info =>
             {
                 App.DispatcherQueue.TryEnqueue(() =>
                 {
-                    if (info.Percent < 0)
+                    if (info.Percent < 0 || info.Phase == FlashPhase.Failed)
                     {
                         StatusText = "[FAIL] 刷写失败";
                         HasExactProgress = false;
@@ -306,11 +321,12 @@ public partial class FlashPageViewModel : ObservableObject
                     FlashProgress = info.Percent;
                     FlashSpeedText = info.SpeedText;
 
+                    // 百分比和速度都只在进度条控件上显示一次：左边是进度、右边是速度。
+                    // 状态行再写一遍是同一组数字出现两次，而它本身就是最容易被窗口
+                    // 宽度挤断的一行。
                     StatusText = info.Percent >= 100
                         ? $"[OK] {partition} 分区刷写完成!"
-                        : !string.IsNullOrEmpty(info.SpeedText)
-                            ? $"正在刷写... {info.Percent}%  {info.SpeedText}"
-                            : $"正在刷写... {info.Percent}%";
+                        : "正在刷写...";
                 });
             };
 
@@ -318,7 +334,7 @@ public partial class FlashPageViewModel : ObservableObject
                 partition,
                 ImagePath,
                 progressReporter,
-                AppendLog,
+                AppendOutputLine,
                 _flashCts.Token);
 
             StatusText       = success ? "[OK] 刷写完成" : "[FAIL] 刷写失败";
@@ -357,4 +373,32 @@ public partial class FlashPageViewModel : ObservableObject
     /// </summary>
     public void AppendLog(string message)
         => SailTool.Helpers.LogWriter.Append(() => LogText, t => LogText = t, message);
+
+    /// <summary>
+    /// Writes one line of fastboot output: progress frames overwrite the previous
+    /// frame so a transfer occupies a single line climbing 0 → 100%, everything else
+    /// is appended.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The panel is the only place raw fastboot output is shown, and the shipped
+    /// build redraws its bar on stderr several times a second. Appending every frame
+    /// is what used to push the rest of the log off screen during a flash.
+    /// </para>
+    /// <para>
+    /// The drawn bar is stripped from the frame before it reaches the panel: the
+    /// page already has a real progress bar directly above the log, and a second
+    /// one in characters says the same thing twice. The numbers stay.
+    /// </para>
+    /// </remarks>
+    private void AppendOutputLine(string line)
+    {
+        if (SailTool.Services.Parsing.FastbootOutputParser.IsProgressLine(line))
+            SailTool.Helpers.LogWriter.AppendProgress(
+                () => LogText,
+                t => LogText = t,
+                SailTool.Services.Parsing.FastbootOutputParser.RemoveProgressBar(line));
+        else
+            AppendLog(line);
+    }
 }

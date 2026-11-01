@@ -37,4 +37,11 @@
     <ProjectReference Include="..\..\src\SailTool\SailTool.csproj" />
   </ItemGroup>
 
+  <!-- Recorded fastboot output replayed by FlashProgressReplayTests. Copied next to
+       the test assembly so the replay reads the real file rather than a
+       transcription of it, which could drift from what the build actually emits. -->
+  <ItemGroup>
+    <Content Include="TestData\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

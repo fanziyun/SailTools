@@ -27,6 +27,9 @@ PublishScripts/
 [Ll]ogs/
 *.log
 *.binlog
+# 例外：进度回放测试的数据文件。它是录下来的 fastboot 输出，不是运行日志；
+# 上面的 *.log 会让新克隆的仓库缺这个文件，FlashProgressReplayTests 直接失败。
+!tests/SailTool.Tests/TestData/*.log
 
 ## Test results
 [Tt]est[Rr]esult*/

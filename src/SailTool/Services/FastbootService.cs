@@ -16,7 +16,7 @@ namespace SailTool.Services;
 /// <para>
 /// Text interpretation lives in <see cref="FastbootOutputParser"/>, which is what
 /// the test project exercises — see the remarks on
-/// <see cref="FastbootOutputParser.ProgressSpeedRegex"/> before changing anything
+/// <see cref="FastbootOutputParser.TransferProgressRegex"/> before changing anything
 /// about progress handling.
 /// </para>
 /// </remarks>
@@ -73,8 +73,21 @@ public sealed class FastbootService(
     // ══════════════════════════════════════════════════════════════
 
     /// <summary>
+    /// Whether the fastboot.exe in use can emit transfer progress lines, i.e.
+    /// whether the flash UI can show a real percentage and an instantaneous rate.
+    /// </summary>
+    /// <remarks>
+    /// Decided by scanning the binary for the progress format string rather than by
+    /// watching what arrives, so the UI can tell the user before a flash starts
+    /// instead of leaving an empty bar and no explanation. See
+    /// <see cref="FastbootCapability"/> and <c>tools/platform-tools/PROVENANCE.md</c>.
+    /// </remarks>
+    public bool SupportsTransferProgress
+        => FastbootCapability.SupportsTransferProgress(FastbootPath);
+
+    /// <summary>
     /// Flashes <paramref name="imgPath"/> to <paramref name="partition"/>.
-    /// Progress (percentage and, where available, transfer speed) is reported via
+    /// Progress (percentage, transfer speed, byte counts and phase) is reported via
     /// <paramref name="onProgress"/>; raw output lines go to <paramref name="onOutput"/>.
     /// </summary>
     /// <remarks>
@@ -83,10 +96,18 @@ public sealed class FastbootService(
     /// The caller is responsible for dispatching UI updates via <c>DispatcherQueue</c>.
     /// </para>
     /// <para>
-    /// Stock fastboot reports no intermediate percentage for a single-chunk
-    /// transfer. The paths that do yield one are sparse chunking, an explicit
-    /// <c>(bootloader) N%</c> on some devices, and a speed derived from the
-    /// <c>OKAY [Ns]</c> timing. See <see cref="FastbootOutputParser"/>.
+    /// Updates are rate-limited to one per <see cref="ProgressThrottle.IntervalMs"/>,
+    /// with identical repeats dropped and terminal states passed through at once.
+    /// A progress-capable fastboot redraws its transfer line per chunk sent and no
+    /// faster than the bar's own 25 ms gate — up to 40 frames a second on a large
+    /// image — so an unthrottled callback would saturate the dispatcher.
+    /// </para>
+    /// <para>
+    /// Against an official fastboot build, which reports no intermediate percentage
+    /// for a single-chunk transfer, the paths that do yield progress are sparse
+    /// chunking, an explicit <c>(bootloader) N%</c> on some devices, and an average
+    /// speed derived from the <c>OKAY [Ns]</c> timing. See
+    /// <see cref="FastbootOutputParser"/>.
     /// </para>
     /// </remarks>
     public async Task<bool> FlashImageAsync(
@@ -112,8 +133,32 @@ public sealed class FastbootService(
             CreateNoWindow         = true
         };
 
+        // The shipped fastboot draws its progress bar only when stderr is a real
+        // console, because the bar repaints the line with \r and would corrupt a
+        // script's output otherwise. This app always reads through a pipe, so
+        // without this the whole transfer is silent. The variable is our patch to
+        // the binary (see tools/platform-tools/PROVENANCE.md); a build that does
+        // not know it ignores it, and NO_PROGRESS=1 would still win over it.
+        psi.Environment["FORCE_PROGRESS"] = "1";
+
+        // The throttle sits between the tracker and the caller: the tracker still
+        // sees every line (it needs them all to keep its cursors correct), while the
+        // UI only hears about the ones worth rendering.
+        var       throttle      = new ProgressThrottle();
+        Action<FlashProgressInfo>? throttled = onProgress is null
+            ? null
+            : info => { if (throttle.ShouldRender(info)) onProgress(info); };
+
+        // Same idea for the log panel: progress lines are sampled, everything else
+        // is appended verbatim. Without this a large image writes several thousand
+        // near-identical lines into the panel.
+        var       logGate       = new ProgressLogGate();
+        Action<string>? gatedOutput = onOutput is null
+            ? null
+            : line => { if (logGate.ShouldLog(line)) onOutput(line); };
+
         using var process       = _processService.TrackProcess(psi);
-        var       tracker       = new FlashProgressTracker(onProgress);
+        var       tracker       = new FlashProgressTracker(throttled);
         var       tcsCompletion = new TaskCompletionSource<bool>();
 
         process.EnableRaisingEvents = true;
@@ -125,13 +170,14 @@ public sealed class FastbootService(
         process.Start();
 
         // ── Read stderr as raw byte stream ────────────────────────
-        // fastboot v36+ uses \r (not \n) to overwrite the same line for
-        // progress updates, so BeginErrorReadLine() misses intermediate
-        // frames.  We split manually on both \r and \n.
+        // A progress-capable fastboot uses \r (not \n) to overwrite the same line,
+        // so BeginErrorReadLine() misses intermediate frames. We split manually on
+        // both \r and \n. onOutput receives the gated lines; the tracker receives
+        // every line via onParsed and must not be gated, or its cursors lose data.
         using var stderrStream   = process.StandardError.BaseStream;
         using var stdoutStream   = process.StandardOutput.BaseStream;
-        var       stderrReadTask = FastbootProcessService.ReadStreamLinesAsync(stderrStream, onOutput, tracker.HandleLine, ct);
-        var       stdoutReadTask = FastbootProcessService.ReadStreamLinesAsync(stdoutStream, onOutput, null,            ct);
+        var       stderrReadTask = FastbootProcessService.ReadStreamLinesAsync(stderrStream, gatedOutput, tracker.HandleLine, ct);
+        var       stdoutReadTask = FastbootProcessService.ReadStreamLinesAsync(stdoutStream, gatedOutput, null,               ct);
 
         // ── Wait for exit (cooperative with CancellationToken) ────
         using var ctReg = ct.Register(() =>

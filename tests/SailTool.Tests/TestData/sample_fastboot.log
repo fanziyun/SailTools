@@ -1,0 +1,30 @@
+[13:28:10] 已选择镜像F:\yan13\Downloads\Recovery.img
+[13:28:11] Recovery.img > recovery.img | 100MB
+[13:28:11] 等待Fastboot设备...60s
+[13:28:11] 已连接 14d93093 | 用时 1 秒
+[13:28:11] 等待设备连接稳定...0s
+[13:28:15] Sending 'recovery' (102400 KB)
+Sending 'recovery' (102400 KB)
+recovery:   5.0 MB/100.0 MB (5.0%) [raw] 26.40 MB/s
+recovery:  10.0 MB/100.0 MB (10.0%) [raw] 33.10 MB/s
+recovery:  15.0 MB/100.0 MB (15.0%) [raw] 36.80 MB/s
+recovery:  20.0 MB/100.0 MB (20.0%) [raw] 38.20 MB/s
+recovery:  25.0 MB/100.0 MB (25.0%) [raw] 39.05 MB/s
+recovery:  30.0 MB/100.0 MB (30.0%) [raw] 39.60 MB/s
+recovery:  35.0 MB/100.0 MB (35.0%) [raw] 39.90 MB/s
+recovery:  40.0 MB/100.0 MB (40.0%) [raw] 40.02 MB/s
+recovery:  45.0 MB/100.0 MB (45.0%) [raw] 40.10 MB/s
+recovery:  50.0 MB/100.0 MB (50.0%) [raw] 40.15 MB/s
+recovery:  55.0 MB/100.0 MB (55.0%) [raw] 40.18 MB/s
+recovery:  60.0 MB/100.0 MB (60.0%) [raw] 40.20 MB/s
+recovery:  65.0 MB/100.0 MB (65.0%) [raw] 40.22 MB/s
+recovery:  70.0 MB/100.0 MB (70.0%) [raw] 40.24 MB/s
+recovery:  75.0 MB/100.0 MB (75.0%) [raw] 40.25 MB/s
+recovery:  80.0 MB/100.0 MB (80.0%) [raw] 40.26 MB/s
+recovery:  85.0 MB/100.0 MB (85.0%) [raw] 40.27 MB/s
+recovery:  90.0 MB/100.0 MB (90.0%) [raw] 40.28 MB/s
+recovery:  95.0 MB/100.0 MB (95.0%) [raw] 40.09 MB/s
+recovery: 100.0 MB/100.0 MB (100.0%) [raw] 40.10 MB/s
+OKAY [  2.496s]
+Writing 'recovery'                                 OKAY [  0.030s]
+Finished. Total time: 2.573s

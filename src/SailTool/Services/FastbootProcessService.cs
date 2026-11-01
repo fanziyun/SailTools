@@ -144,28 +144,52 @@ public sealed class FastbootProcessService(string? fastbootPath = null) : IDispo
     // ══════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Reads a process stream byte-by-byte and splits on both '\r' and '\n'.
-    /// This is necessary because fastboot v36+ uses '\r' (not '\n') to update
-    /// progress in-place, which BeginErrorReadLine() silently swallows.
+    /// Reads a process stream and splits it on both '\r' and '\n'.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Splitting on '\r' as well as '\n' is what makes progress reporting work at
+    /// all. A progress-capable fastboot overwrites the same line with a carriage
+    /// return and emits no newline until the phase ends, so
+    /// <c>BeginErrorReadLine()</c> — which waits for '\n' — delivers nothing until
+    /// the transfer is already over, and the bar then jumps from empty to complete.
+    /// </para>
+    /// <para>
+    /// The decoding goes through <see cref="StreamReader"/> rather than
+    /// <c>Encoding.UTF8.GetString</c> on each raw chunk. A multi-byte UTF-8
+    /// sequence can straddle a buffer boundary, and decoding the bytes directly
+    /// would turn it into replacement characters — a bootloader INFO string or a
+    /// non-ASCII partition name arriving in the wrong place would render as mojibake
+    /// in the log. <c>StreamReader</c> carries the incomplete sequence over to the
+    /// next read.
+    /// </para>
+    /// <para>
+    /// Characters are accumulated in a <see cref="StringBuilder"/> and the callback
+    /// fires once per line, not once per character: a multi-gigabyte transfer pushes
+    /// gigabytes through this reader for a few thousand actual lines, and a
+    /// per-character callback would mean millions of regex matches on fragments that
+    /// are not lines yet.
+    /// </para>
+    /// </remarks>
     internal static async Task ReadStreamLinesAsync(
         Stream stream,
         Action<string>? onOutput,
         Action<string>? onParsed,
         CancellationToken ct)
     {
-        var buffer = new byte[4096];
-        var sb     = new StringBuilder();
+        var sb = new StringBuilder();
+        // leaveOpen: the caller owns the stream and disposes it.
+        using var reader = new StreamReader(stream, Encoding.UTF8, leaveOpen: true);
+        var buffer = new char[4096];
 
         try
         {
-            int bytesRead;
-            while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, ct)) > 0)
+            int charsRead;
+            while ((charsRead = await reader.ReadAsync(buffer.AsMemory(), ct)) > 0)
             {
-                var chunk = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-
-                foreach (char c in chunk)
+                for (var i = 0; i < charsRead; i++)
                 {
+                    var c = buffer[i];
                     if (c is '\r' or '\n')
                     {
                         if (sb.Length > 0)
@@ -175,7 +199,8 @@ public sealed class FastbootProcessService(string? fastbootPath = null) : IDispo
                             onOutput?.Invoke(line);
                             onParsed?.Invoke(line);
                         }
-                        // else: consecutive \r\n or \r\r — skip empty segments
+                        // else: the second half of a \r\n pair, or a bare \r used to
+                        // erase a line — nothing to report.
                     }
                     else
                     {
@@ -184,7 +209,7 @@ public sealed class FastbootProcessService(string? fastbootPath = null) : IDispo
                 }
             }
 
-            // Flush any remaining content without a trailing \r or \n
+            // Flush any trailing content with no final \r or \n.
             if (sb.Length > 0)
             {
                 var line = sb.ToString();

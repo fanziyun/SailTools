@@ -75,6 +75,18 @@ public partial class ROMFlashPageViewModel(FastbootService fastboot) : Observabl
     private void AppendLog(string msg)
         => SailTool.Helpers.LogWriter.Append(() => LogText, t => LogText = t, msg, timestamped: true);
 
+    /// <summary>
+    /// 写入一条 fastboot 进度帧：如果面板最后一行已经是进度帧就原地覆盖，
+    /// 否则追加。这样一次传输只占一行，从 0% 走到 100%，不会把日志刷掉。
+    /// </summary>
+    /// <remarks>
+    /// OEM 脚本里每一条 <c>fastboot flash</c> 都会画这个进度条，而线刷要跨十几个
+    /// 分区——逐帧追加的话日志会瞬间翻过几屏，前面分区的成败信息就被挤没了。
+    /// </remarks>
+    private void AppendProgressLog(string msg)
+        => SailTool.Helpers.LogWriter.AppendProgress(
+            () => LogText, t => LogText = t, msg, timestamped: true);
+
     // ══════════════════════════════════════════════════════════════
     //  选择文件夹
     // ══════════════════════════════════════════════════════════════
@@ -321,29 +333,47 @@ public partial class ROMFlashPageViewModel(FastbootService fastboot) : Observabl
             CreateNoWindow         = true,
         };
 
-        // 将 platform-tools 目录注入 PATH，确保 bat 内调用 fastboot 时能找到
+        // 将 platform-tools 目录注入 PATH，确保 bat 内调用 fastboot 时能找到。
+        // 注意：注入的就是随包发布的那份 fastboot，所以 OEM 脚本里的每一条
+        // fastboot flash 都会产生进度行——这决定了下面必须用逐字符读取。
         var fbDir       = Path.GetDirectoryName(_fastboot.FastbootPath) ?? "";
         var currentPath = psi.EnvironmentVariables["PATH"] ?? "";
         psi.EnvironmentVariables["PATH"] = $"{fbDir};{currentPath}";
 
-        // AppendLog already marshals onto the UI thread, so no outer TryEnqueue
-        // is needed here; adding one only delayed the timestamp by a hop.
-        void OnData(object? _, DataReceivedEventArgs e)
-        {
-            if (e.Data is not null) AppendLog(e.Data);
-        }
+        // 与 FlashImageAsync 同样的理由：这份 fastboot 只在 stderr 是终端时才画进度条，
+        // 而这里是管道。cmd.exe 把它继承给 bat 里的每一条 fastboot 调用。
+        psi.EnvironmentVariables["FORCE_PROGRESS"] = "1";
 
         using var process       = new Process { StartInfo = psi, EnableRaisingEvents = true };
         var       tcsCompletion = new TaskCompletionSource<bool>();
 
-        process.OutputDataReceived += OnData;
-        process.ErrorDataReceived  += OnData;
         process.Exited += (_, _) =>
             tcsCompletion.TrySetResult(process.ExitCode == 0);
 
         process.Start();
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
+
+        // ── 为什么不用 BeginOutputReadLine ─────────────────────────
+        // 带进度输出的 fastboot 用 \r 原地刷新同一行，直到阶段结束才发 \n。
+        // BeginOutputReadLine 按 \n 切分，于是整个传输期间一行都不给，
+        // 结束时一次性倒出几百上千行进度——面板会卡死。
+        // 这里复用 FlashImageAsync 用的同一个逐字符读取器，并接同一个限流闸门。
+        var logGate = new ProgressLogGate();
+        void GatedAppend(string line)
+        {
+            if (!logGate.ShouldLog(line)) return;
+            if (SailTool.Services.Parsing.FastbootOutputParser.IsProgressLine(line))
+                // 与刷写页一致：图形条去掉，只留数字。页面自己就有进度条控件。
+                AppendProgressLog(SailTool.Services.Parsing.FastbootOutputParser.RemoveProgressBar(line));
+            else
+                AppendLog(line);
+        }
+
+        using var stdoutStream = process.StandardOutput.BaseStream;
+        using var stderrStream = process.StandardError.BaseStream;
+        var stdoutTask = FastbootProcessService.ReadStreamLinesAsync(
+            stdoutStream, GatedAppend, onParsed: null, ct);
+        var stderrTask = FastbootProcessService.ReadStreamLinesAsync(
+            stderrStream, GatedAppend, onParsed: null, ct);
 
         using var ctReg = ct.Register(() =>
         {
@@ -352,7 +382,12 @@ public partial class ROMFlashPageViewModel(FastbootService fastboot) : Observabl
             tcsCompletion.TrySetCanceled();
         });
 
-        var success = await tcsCompletion.Task;
+        // Await the readers alongside exit. Waiting on exit alone would let the
+        // process finish while the tail of its output is still in the pipes, so the
+        // final "Finished." or error line — the one that explains a failure — could
+        // be dropped from the log.
+        await Task.WhenAll(tcsCompletion.Task, stdoutTask, stderrTask);
+        var success = tcsCompletion.Task.Result;
         StatusText  = success ? "线刷完成" : "线刷失败 (非零退出码)";
         AppendLog(success ? "[完成] 线刷成功" : "[失败] 线刷返回非零退出码");
     }

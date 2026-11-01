@@ -1,5 +1,7 @@
 namespace SailTool.Helpers;
 
+using SailTool.Services.Parsing;
+
 /// <summary>
 /// Appends lines to a page's log buffer, marshalling onto the UI thread.
 /// </summary>
@@ -15,6 +17,12 @@ namespace SailTool.Helpers;
 /// with a <c>[HH:mm:ss]</c> timestamp and the custom-flash log does not. That
 /// difference is the <paramref name="timestamped"/> flag, so sharing the helper
 /// does not merge the two formats.
+/// </para>
+/// <para>
+/// <see cref="AppendProgress"/> is the same write with one extra rule: if the
+/// buffer's last line is already a progress frame, the frame is overwritten in
+/// place instead of being appended, so a transfer occupies exactly one line that
+/// climbs from 0% to 100%. See <see cref="LogBuffer"/>.
 /// </para>
 /// </remarks>
 internal static class LogWriter
@@ -36,7 +44,33 @@ internal static class LogWriter
         App.DispatcherQueue.TryEnqueue(() =>
         {
             var line = timestamped ? $"[{DateTime.Now:HH:mm:ss}] {message}" : message;
-            set(get() + line + "\n");
+            set(LogBuffer.Append(get(), line));
+        });
+    }
+
+    /// <summary>
+    /// Appends a transfer-progress frame, overwriting the previous frame when the
+    /// buffer's last line is one.
+    /// </summary>
+    /// <remarks>
+    /// The replace-or-append decision is taken on the UI thread, inside the same
+    /// dispatcher callback that writes the buffer. Deciding it on the reader's
+    /// thread would let two readers (stdout and stderr) each see a stale buffer and
+    /// both choose "append".
+    /// </remarks>
+    internal static void AppendProgress(
+        Func<string> get,
+        Action<string> set,
+        string message,
+        bool timestamped = false)
+    {
+        App.DispatcherQueue.TryEnqueue(() =>
+        {
+            var line = timestamped ? $"[{DateTime.Now:HH:mm:ss}] {message}" : message;
+            var current = get();
+            set(LogBuffer.LastLineIsProgress(current)
+                ? LogBuffer.ReplaceLastLine(current, line)
+                : LogBuffer.Append(current, line));
         });
     }
 }
