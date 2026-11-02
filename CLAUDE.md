@@ -95,6 +95,24 @@ keeps the SDK from appending `+<sha>` and leaking a hash into the settings page.
 `SettingsPageViewModel.ReadAssemblyVersion()` reads that attribute, so the number
 in the UI cannot drift from the artifact filename.
 
+## Main window
+
+**The window is pinned at 1552×1063 physical pixels.** `MainWindow`'s constructor
+sets it once via `AppWindow.MoveAndResize`; `AppWindow` takes physical pixels, not
+DIPs, so the size is unaffected by display scaling. At the system's 125% scaling a
+DPI-unaware reader (a plain `GetWindowRect` from PowerShell) reports 1242×850 —
+measure with `SetThreadDpiAwarenessContext(PER_MONITOR_AWARE_V2)` before deciding
+the size is wrong. `OverlappedPresenter.IsResizable = false` and
+`IsMaximizable = false` strip `WS_THICKFRAME` and `WS_MAXIMIZEBOX`, so edges cannot
+be dragged and the title bar cannot be double-clicked to maximize; minimizing is
+still allowed. Launch centers the window in the display's work area (top-left if
+the screen is smaller than the window).
+
+**The position is not locked or persisted.** The user can drag the window, and
+every launch re-centers it. A window found partly off the right edge (once seen at
+x=1306 on the 2560-wide screen) was dragged there; that is not a centering
+regression — the launch-time position is the work-area center.
+
 ## Where things live
 
 ```
