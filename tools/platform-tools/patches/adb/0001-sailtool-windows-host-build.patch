@@ -1,0 +1,454 @@
+diff --git a/cmake/host_compat.h b/cmake/host_compat.h
+new file mode 100644
+index 0000000..6a20840
+--- /dev/null
++++ b/cmake/host_compat.h
+@@ -0,0 +1,7 @@
++#pragma once
++// SailTool build shim: AOSP 8.1's host sources relied on cutils/trace.h doing
++// `using namespace std;` for chrono literals (1s, 100ms). That using also made
++// std::byte ambiguous with the Windows SDK's byte, so it is removed and the
++// literal namespace is supplied here instead.
++#include <chrono>
++using namespace std::chrono_literals;
+diff --git a/lib/libcutils/include/cutils/trace.h b/lib/libcutils/include/cutils/trace.h
+index 5fb07d0..034ffdf 100644
+--- a/lib/libcutils/include/cutils/trace.h
++++ b/lib/libcutils/include/cutils/trace.h
+@@ -20,9 +20,10 @@
+ #include <inttypes.h>
+ #ifdef __cplusplus
+ #include <atomic>
+-using namespace std;
++#define ATRACE_ACQUIRE_LOAD(p) std::atomic_load_explicit((p), std::memory_order_acquire)
+ #else
+ #include <stdatomic.h>
++#define ATRACE_ACQUIRE_LOAD(p) atomic_load_explicit((p), memory_order_acquire)
+ #endif
+ #include <stdbool.h>
+ #include <stdint.h>
+@@ -123,7 +124,11 @@ void atrace_set_tracing_enabled(bool enabled);
+  * Nonzero indicates setup has completed.
+  * Note: This does NOT indicate whether or not setup was successful.
+  */
+-extern atomic<bool> atrace_is_ready;
++#ifdef __cplusplus
++extern std::atomic<bool> atrace_is_ready;
++#else
++extern atomic_bool atrace_is_ready;
++#endif
+ 
+ /**
+  * Set of ATRACE_TAG flags to trace for, initialized to ATRACE_TAG_NOT_READY.
+@@ -146,7 +151,7 @@ extern int atrace_marker_fd;
+ #define ATRACE_INIT() atrace_init()
+ static inline void atrace_init()
+ {
+-    if (CC_UNLIKELY(!atomic_load_explicit(&atrace_is_ready, memory_order_acquire))) {
++    if (CC_UNLIKELY(!ATRACE_ACQUIRE_LOAD(&atrace_is_ready))) {
+         atrace_setup();
+     }
+ }
+diff --git a/lib/windows/usb/api/adb_api.cpp b/lib/windows/usb/api/adb_api.cpp
+index b734fe2..9039186 100644
+--- a/lib/windows/usb/api/adb_api.cpp
++++ b/lib/windows/usb/api/adb_api.cpp
+@@ -434,7 +434,7 @@ ADBAPIHANDLE __cdecl AdbWriteEndpointAsync(ADBAPIHANDLE adb_endpoint,
+     return ret;
+   } else {
+     SetLastError(ERROR_INVALID_HANDLE);
+-    return false;
++    return NULL;
+   }
+ }
+ 
+diff --git a/lib/windows/usb/api/adb_api.h b/lib/windows/usb/api/adb_api.h
+index 78f625b..344707b 100644
+--- a/lib/windows/usb/api/adb_api.h
++++ b/lib/windows/usb/api/adb_api.h
+@@ -141,6 +141,9 @@ typedef struct _AdbEndpointInformation {
+ */
+ typedef void* ADBAPIHANDLE;
+ 
++/** rief Handle to an API instance created by CreateAdbApiInstance. */
++typedef void* ADBAPIINSTANCEHANDLE;
++
+ /** \brief Defines access type with which an I/O object (endpoint)
+   should be opened.
+ */
+diff --git a/lib/windows/usb/api/adb_legacy_endpoint_object.cpp b/lib/windows/usb/api/adb_legacy_endpoint_object.cpp
+index e95fa16..38e7867 100644
+--- a/lib/windows/usb/api/adb_legacy_endpoint_object.cpp
++++ b/lib/windows/usb/api/adb_legacy_endpoint_object.cpp
+@@ -53,7 +53,7 @@ ADBAPIHANDLE AdbLegacyEndpointObject::CommonAsyncReadWrite(
+ 
+   if (!IsOpened()) {
+     SetLastError(ERROR_INVALID_HANDLE);
+-    return false;
++    return NULL;
+   }
+ 
+   bool is_ioctl_write = is_read ? false : (0 != time_out);
+diff --git a/lib/windows/usb/api/adb_legacy_interface.cpp b/lib/windows/usb/api/adb_legacy_interface.cpp
+index 1e177d3..055ea4e 100644
+--- a/lib/windows/usb/api/adb_legacy_interface.cpp
++++ b/lib/windows/usb/api/adb_legacy_interface.cpp
+@@ -67,7 +67,7 @@ ADBAPIHANDLE AdbLegacyInterfaceObject::CreateHandle() {
+   }
+ 
+   if (!ok) {
+-    return false;
++    return NULL;
+   }
+ 
+   // Save indexes and IDs for bulk read / write endpoints. We will use them to
+@@ -78,7 +78,7 @@ ADBAPIHANDLE AdbLegacyInterfaceObject::CreateHandle() {
+     // Get endpoint information
+     AdbEndpointInformation pipe_info;
+     if (!GetEndpointInformation(endpoint, &pipe_info)) {
+-      return false;
++      return NULL;
+     }
+ 
+     if (AdbEndpointTypeBulk == pipe_info.endpoint_type) {
+@@ -230,7 +230,7 @@ ADBAPIHANDLE AdbLegacyInterfaceObject::OpenEndpoint(
+       endpoint_index = def_write_endpoint_;
+     } else {
+       SetLastError(ERROR_INVALID_PARAMETER);
+-      return false;
++      return NULL;
+     }
+   } catch (...) {
+     // We don't expect exceptions other than OOM thrown here.
+@@ -250,7 +250,7 @@ ADBAPIHANDLE AdbLegacyInterfaceObject::OpenEndpoint(
+     AdbOpenSharingMode sharing_mode) {
+   if (!IsOpened()) {
+     SetLastError(ERROR_INVALID_HANDLE);
+-    return false;
++    return NULL;
+   }
+ 
+   AdbLegacyEndpointObject* adb_endpoint = NULL;
+diff --git a/lib/windows/usb/api/stdafx.h b/lib/windows/usb/api/stdafx.h
+index bcc2439..e5634d2 100644
+--- a/lib/windows/usb/api/stdafx.h
++++ b/lib/windows/usb/api/stdafx.h
+@@ -63,7 +63,11 @@
+ #include <windows.h>
+ #pragma warning(disable: 4702)
+ #pragma warning(disable: 4201)
++#if defined(__MINGW32__)
++#include "atl_compat.h"
++#else
+ #include <atlbase.h>
++#endif
+ #include <winioctl.h>
+ #include <setupapi.h>
+ #include <vector>
+@@ -76,4 +80,6 @@
+ 
+ #include "resource.h"
+ 
++#if !defined(__MINGW32__)
+ using namespace ATL;
++#endif
+diff --git a/lib/windows/usb/compat/atl_compat.h b/lib/windows/usb/compat/atl_compat.h
+new file mode 100644
+index 0000000..2ed841b
+--- /dev/null
++++ b/lib/windows/usb/compat/atl_compat.h
+@@ -0,0 +1,34 @@
++#pragma once
++/* Minimal ATL replacement: the AOSP sources use exactly one ATL class
++ * (CComAutoCriticalSection) plus CComCritSecLock.  Both map directly onto the
++ * Win32 critical section. */
++#include <windows.h>
++#include <assert.h>
++#ifndef ATLASSERT
++#define ATLASSERT(x) assert(x)
++#endif
++template <class T> class CAtlDllModuleT {
++public:
++    BOOL DllMain(DWORD, LPVOID) { return TRUE; }
++};
++class CComAutoCriticalSection {
++public:
++    CComAutoCriticalSection()  { ::InitializeCriticalSection(&cs_); }
++    ~CComAutoCriticalSection() { ::DeleteCriticalSection(&cs_); }
++    void Lock()   { ::EnterCriticalSection(&cs_); }
++    void Unlock() { ::LeaveCriticalSection(&cs_); }
++private:
++    CRITICAL_SECTION cs_;
++    CComAutoCriticalSection(const CComAutoCriticalSection&);
++    CComAutoCriticalSection& operator=(const CComAutoCriticalSection&);
++};
++template <class T>
++class CComCritSecLock {
++public:
++    explicit CComCritSecLock(T& cs) : cs_(cs) { cs_.Lock(); }
++    ~CComCritSecLock() { cs_.Unlock(); }
++private:
++    T& cs_;
++    CComCritSecLock(const CComCritSecLock&);
++    CComCritSecLock& operator=(const CComCritSecLock&);
++};
+diff --git a/lib/windows/usb/compat/usb100.h b/lib/windows/usb/compat/usb100.h
+new file mode 100644
+index 0000000..b2bbd91
+--- /dev/null
++++ b/lib/windows/usb/compat/usb100.h
+@@ -0,0 +1,52 @@
++#pragma once
++/* Minimal WDK usb100.h subset for MinGW.  Only the descriptor layouts the
++ * AOSP AdbWinApi sources use; both are fixed by the USB 2.0 spec. */
++#include <windows.h>
++#include <pshpack1.h>
++typedef struct _USB_DEVICE_DESCRIPTOR {
++    UCHAR  bLength;
++    UCHAR  bDescriptorType;
++    USHORT bcdUSB;
++    UCHAR  bDeviceClass;
++    UCHAR  bDeviceSubClass;
++    UCHAR  bDeviceProtocol;
++    UCHAR  bMaxPacketSize0;
++    USHORT idVendor;
++    USHORT idProduct;
++    USHORT bcdDevice;
++    UCHAR  iManufacturer;
++    UCHAR  iProduct;
++    UCHAR  iSerialNumber;
++    UCHAR  bNumConfigurations;
++} USB_DEVICE_DESCRIPTOR, *PUSB_DEVICE_DESCRIPTOR;
++typedef struct _USB_CONFIGURATION_DESCRIPTOR {
++    UCHAR  bLength;
++    UCHAR  bDescriptorType;
++    USHORT wTotalLength;
++    UCHAR  bNumInterfaces;
++    UCHAR  bConfigurationValue;
++    UCHAR  iConfiguration;
++    UCHAR  bmAttributes;
++    UCHAR  MaxPower;
++} USB_CONFIGURATION_DESCRIPTOR, *PUSB_CONFIGURATION_DESCRIPTOR;
++typedef struct _USB_INTERFACE_DESCRIPTOR {
++    UCHAR bLength;
++    UCHAR bDescriptorType;
++    UCHAR bInterfaceNumber;
++    UCHAR bAlternateSetting;
++    UCHAR bNumEndpoints;
++    UCHAR bInterfaceClass;
++    UCHAR bInterfaceSubClass;
++    UCHAR bInterfaceProtocol;
++    UCHAR iInterface;
++} USB_INTERFACE_DESCRIPTOR, *PUSB_INTERFACE_DESCRIPTOR;
++#include <poppack.h>
++#define USB_ENDPOINT_DIRECTION_MASK 0x80
++#define USB_DEVICE_DESCRIPTOR_TYPE          0x01
++#define USB_CONFIGURATION_DESCRIPTOR_TYPE   0x02
++#define USB_STRING_DESCRIPTOR_TYPE          0x03
++typedef struct _USB_STRING_DESCRIPTOR {
++    UCHAR bLength;
++    UCHAR bDescriptorType;
++    WCHAR bString[1];
++} USB_STRING_DESCRIPTOR, *PUSB_STRING_DESCRIPTOR;
+diff --git a/lib/windows/usb/compat/usbdi.h b/lib/windows/usb/compat/usbdi.h
+new file mode 100644
+index 0000000..8d1826f
+--- /dev/null
++++ b/lib/windows/usb/compat/usbdi.h
+@@ -0,0 +1,16 @@
++#pragma once
++/* Minimal WDK usbdi.h subset: the pipe enum/struct names the AOSP sources
++ * mention; the AdbWinApi implementation itself uses its own AdbEndpointType. */
++#include <windows.h>
++typedef enum _USBD_PIPE_TYPE {
++    UsbdPipeTypeControl,
++    UsbdPipeTypeIsochronous,
++    UsbdPipeTypeBulk,
++    UsbdPipeTypeInterrupt
++} USBD_PIPE_TYPE;
++typedef struct _USB_PIPE_INFORMATION {
++    USBD_PIPE_TYPE PipeType;
++    ULONG          PipeHandle;
++    ULONG          MaximumPacketSize;
++    ULONG          MaximumTransferSize;
++} USB_PIPE_INFORMATION, *PUSB_PIPE_INFORMATION;
+diff --git a/lib/windows/usb/compat/winusb.h b/lib/windows/usb/compat/winusb.h
+new file mode 100644
+index 0000000..dd37f46
+--- /dev/null
++++ b/lib/windows/usb/compat/winusb.h
+@@ -0,0 +1,40 @@
++#pragma once
++/* Minimal WinUSB API surface for MinGW.  Type layouts match the Windows SDK's
++ * winusb.h; only the entry points the AOSP AdbWinUsbApi sources call. */
++#include <windows.h>
++#include <usb100.h>
++#include <usbdi.h>
++typedef PVOID WINUSB_INTERFACE_HANDLE, *PWINUSB_INTERFACE_HANDLE;
++typedef struct _WINUSB_PIPE_INFORMATION {
++    USBD_PIPE_TYPE PipeType;
++    UCHAR          PipeId;
++    USHORT         MaximumPacketSize;
++    UCHAR          Interval;
++    ULONG          MaximumTransferSize;
++} WINUSB_PIPE_INFORMATION, *PWINUSB_PIPE_INFORMATION;
++#define PIPE_TRANSFER_TIMEOUT 0x03
++typedef struct _WINUSB_SETUP_PACKET {
++    UCHAR  RequestType;
++    UCHAR  Request;
++    USHORT Value;
++    USHORT Index;
++    USHORT Length;
++} WINUSB_SETUP_PACKET, *PWINUSB_SETUP_PACKET;
++#ifdef __cplusplus
++extern "C" {
++#endif
++BOOL  WINAPI WinUsb_Initialize(HANDLE, PWINUSB_INTERFACE_HANDLE);
++BOOL  WINAPI WinUsb_Free(WINUSB_INTERFACE_HANDLE);
++BOOL  WINAPI WinUsb_GetDescriptor(WINUSB_INTERFACE_HANDLE, UCHAR, UCHAR, USHORT, PUCHAR, ULONG, PULONG);
++BOOL  WINAPI WinUsb_QueryInterfaceSettings(WINUSB_INTERFACE_HANDLE, UCHAR, PUSB_INTERFACE_DESCRIPTOR);
++BOOL  WINAPI WinUsb_QueryPipe(WINUSB_INTERFACE_HANDLE, UCHAR, UCHAR, PWINUSB_PIPE_INFORMATION);
++BOOL  WINAPI WinUsb_SetPipePolicy(WINUSB_INTERFACE_HANDLE, UCHAR, ULONG, ULONG, PVOID);
++BOOL  WINAPI WinUsb_ResetPipe(WINUSB_INTERFACE_HANDLE, UCHAR);
++BOOL  WINAPI WinUsb_AbortPipe(WINUSB_INTERFACE_HANDLE, UCHAR);
++BOOL  WINAPI WinUsb_ReadPipe(WINUSB_INTERFACE_HANDLE, UCHAR, PUCHAR, ULONG, PULONG, LPOVERLAPPED);
++BOOL  WINAPI WinUsb_WritePipe(WINUSB_INTERFACE_HANDLE, UCHAR, PUCHAR, ULONG, PULONG, LPOVERLAPPED);
++BOOL  WINAPI WinUsb_GetOverlappedResult(WINUSB_INTERFACE_HANDLE, LPOVERLAPPED, PULONG, BOOL);
++BOOL  WINAPI WinUsb_GetCurrentAlternateSetting(WINUSB_INTERFACE_HANDLE, PUCHAR);
++#ifdef __cplusplus
++}
++#endif
+diff --git a/lib/windows/usb/winusb/adb_winusb_endpoint_object.cpp b/lib/windows/usb/winusb/adb_winusb_endpoint_object.cpp
+index dd32f5b..4785ce1 100644
+--- a/lib/windows/usb/winusb/adb_winusb_endpoint_object.cpp
++++ b/lib/windows/usb/winusb/adb_winusb_endpoint_object.cpp
+@@ -104,7 +104,7 @@ ADBAPIHANDLE AdbWinUsbEndpointObject::CommonAsyncReadWrite(
+   // CommonSyncReadWrite(). This is not yet implemented because there are no
+   // callers to Adb{Read,Write}EndpointAsync() in AOSP, and hence no testing.
+   if (!SetTimeout(time_out))
+-    return false;
++    return NULL;
+ 
+   // Create completion i/o object
+   AdbIOCompletion* adb_io_completion = NULL;
+diff --git a/lib/windows/usb/winusb/adb_winusb_interface.cpp b/lib/windows/usb/winusb/adb_winusb_interface.cpp
+index e2cb06e..e1ca3e0 100644
+--- a/lib/windows/usb/winusb/adb_winusb_interface.cpp
++++ b/lib/windows/usb/winusb/adb_winusb_interface.cpp
+@@ -69,7 +69,7 @@ ADBAPIHANDLE AdbWinUsbInterfaceObject::CreateHandle() {
+   // Cache current interface number that will be used in
+   // WinUsb_Xxx calls performed on this interface.
+   if (!WinUsb_GetCurrentAlternateSetting(winusb_handle(), &interface_number_))
+-    return false;
++    return NULL;
+ 
+   // Cache interface properties
+   unsigned long bytes_written;
+@@ -78,7 +78,7 @@ ADBAPIHANDLE AdbWinUsbInterfaceObject::CreateHandle() {
+   if (!WinUsb_GetDescriptor(winusb_handle(), USB_DEVICE_DESCRIPTOR_TYPE, 0, 0,
+                             reinterpret_cast<PUCHAR>(&usb_device_descriptor_),
+                             sizeof(usb_device_descriptor_), &bytes_written)) {
+-    return false;
++    return NULL;
+   }
+ 
+   // Cache USB configuration descriptor
+@@ -86,13 +86,13 @@ ADBAPIHANDLE AdbWinUsbInterfaceObject::CreateHandle() {
+                             0, 0,
+                             reinterpret_cast<PUCHAR>(&usb_config_descriptor_),
+                             sizeof(usb_config_descriptor_), &bytes_written)) {
+-    return false;
++    return NULL;
+   }
+ 
+   // Cache USB interface descriptor
+   if (!WinUsb_QueryInterfaceSettings(winusb_handle(), interface_number(),
+                                      &usb_interface_descriptor_)) {
+-    return false;
++    return NULL;
+   }
+ 
+   // Save indexes and IDs for bulk read / write endpoints. We will use them to
+@@ -104,7 +104,7 @@ ADBAPIHANDLE AdbWinUsbInterfaceObject::CreateHandle() {
+     WINUSB_PIPE_INFORMATION pipe_info;
+     if (!WinUsb_QueryPipe(winusb_handle(), interface_number(), endpoint,
+                           &pipe_info)) {
+-      return false;
++      return NULL;
+     }
+ 
+     if (UsbdPipeTypeBulk == pipe_info.PipeType) {
+@@ -309,7 +309,7 @@ ADBAPIHANDLE AdbWinUsbInterfaceObject::OpenEndpoint(
+     endpoint_index = def_write_endpoint_;
+   } else {
+     SetLastError(ERROR_INVALID_PARAMETER);
+-    return false;
++    return NULL;
+   }
+ 
+   return OpenEndpoint(endpoint_id, endpoint_index);
+@@ -319,7 +319,7 @@ ADBAPIHANDLE AdbWinUsbInterfaceObject::OpenEndpoint(UCHAR endpoint_id,
+                                                     UCHAR endpoint_index) {
+   if (!IsOpened()) {
+     SetLastError(ERROR_INVALID_HANDLE);
+-    return false;
++    return NULL;
+   }
+ 
+   AdbEndpointObject* adb_endpoint = NULL;
+diff --git a/lib/windows/usb/winusb/stdafx.h b/lib/windows/usb/winusb/stdafx.h
+index 88cd963..1713f1c 100644
+--- a/lib/windows/usb/winusb/stdafx.h
++++ b/lib/windows/usb/winusb/stdafx.h
+@@ -63,7 +63,11 @@
+ #include <windows.h>
+ #pragma warning(disable: 4702)
+ #pragma warning(disable: 4201)
++#if defined(__MINGW32__)
++#include "atl_compat.h"
++#else
+ #include <atlbase.h>
++#endif
+ #include <winioctl.h>
+ #include <setupapi.h>
+ #include <vector>
+@@ -75,4 +79,6 @@
+ 
+ #include "resource.h"
+ 
++#if !defined(__MINGW32__)
+ using namespace ATL;
++#endif
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index a774b7e..b64f474 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -133,6 +133,8 @@ if (WIN32)
+     )
+ endif()
+ 
++target_compile_options(${PROJECT_NAME} PRIVATE -include ${CMAKE_SOURCE_DIR}/cmake/host_compat.h)
++
+ target_compile_definitions(${PROJECT_NAME}
+     PRIVATE -DADB_HOST=1
+ 	#        -DHAVE_FORKEXEC=1
+diff --git a/src/sysdeps_win32.cpp b/src/sysdeps_win32.cpp
+index bce13f5..4c76bfd 100644
+--- a/src/sysdeps_win32.cpp
++++ b/src/sysdeps_win32.cpp
+@@ -2746,13 +2746,13 @@ char* adb_getcwd(char* buf, int size) {
+ }
+ 
+ // The SetThreadDescription API was brought in version 1607 of Windows 10.
+-typedef HRESULT(WINAPI* SetThreadDescription)(HANDLE hThread, PCWSTR lpThreadDescription);
++typedef HRESULT(WINAPI* SetThreadDescriptionFn)(HANDLE hThread, PCWSTR lpThreadDescription);
+ 
+ // Based on PlatformThread::SetName() from
+ // https://cs.chromium.org/chromium/src/base/threading/platform_thread_win.cc
+ int adb_thread_setname(const std::string& name) {
+     // The SetThreadDescription API works even if no debugger is attached.
+-    auto set_thread_description_func = reinterpret_cast<SetThreadDescription>(
++    auto set_thread_description_func = reinterpret_cast<SetThreadDescriptionFn>(
+             ::GetProcAddress(::GetModuleHandleW(L"Kernel32.dll"), "SetThreadDescription"));
+     if (set_thread_description_func) {
+         std::wstring name_wide;

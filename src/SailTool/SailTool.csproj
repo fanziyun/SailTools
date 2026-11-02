@@ -39,22 +39,34 @@
     <PublishAot>false</PublishAot>
   </PropertyGroup>
 
-  <!-- External tools (adb.exe / fastboot.exe / magiskboot.exe) live in the repo-level
-       tools/ directory and are copied to the output as a "platform-tools" subfolder.
-       That is exactly where the runtime already looks for them:
+  <!-- External tools (adb.exe / fastboot.exe / magiskboot.exe) are built from
+       source by tools/platform-tools/build.ps1 into artifacts/platform-tools;
+       nothing prebuilt is checked in. The target below runs that script before
+       the copy items are collected, so a fresh checkout builds the toolset on
+       its first dotnet build. The built folder is then copied to the output as
+       "platform-tools", which is where the runtime looks:
        FastbootProcessService.FindToolInPlatformTools -> AppContext.BaseDirectory\platform-tools\
        PatchService.FindMagiskBootPath               -> same folder as fastboot.exe, or the app dir
-       so no code has to know where the sources live. Content items would be picked up
-       by the WinUI resource indexer, so these are declared as None instead. -->
+       Content items would be picked up by the WinUI resource indexer, so these
+       are declared as None instead. -->
   <PropertyGroup>
     <ExternalToolsDir>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)', '..', '..', 'tools'))</ExternalToolsDir>
+    <PlatformToolsDir>$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)', '..', '..', 'artifacts', 'platform-tools'))</PlatformToolsDir>
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="$(ExternalToolsDir)platform-tools\**\*"
-          Link="platform-tools\%(RecursiveDir)%(Filename)%(Extension)"
-          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(PlatformToolsDir)\adb.exe"         Link="platform-tools\adb.exe"         CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(PlatformToolsDir)\fastboot.exe"    Link="platform-tools\fastboot.exe"    CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(PlatformToolsDir)\magiskboot.exe"  Link="platform-tools\magiskboot.exe"  CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(PlatformToolsDir)\AdbWinApi.dll"   Link="platform-tools\AdbWinApi.dll"   CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(PlatformToolsDir)\AdbWinUsbApi.dll" Link="platform-tools\AdbWinUsbApi.dll" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(PlatformToolsDir)\source.properties" Link="platform-tools\source.properties" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+
+  <Target Name="BuildPlatformTools" BeforeTargets="AssignTargetPaths">
+    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(ExternalToolsDir)platform-tools\build.ps1&quot; -OutputDir &quot;$(PlatformToolsDir)&quot;"
+          StandardOutputImportance="low" />
+  </Target>
 
   <ItemGroup>
     <Content Include="Assets\SplashScreen.scale-200.png" />

@@ -1,0 +1,59 @@
+diff --git a/better_fastboot/cmake/mingw-i686.cmake b/better_fastboot/cmake/mingw-i686.cmake
+index 6e32417..9669f3e 100644
+--- a/better_fastboot/cmake/mingw-i686.cmake
++++ b/better_fastboot/cmake/mingw-i686.cmake
+@@ -15,9 +15,6 @@ set(TOOLCHAIN_PREFIX i686-w64-mingw32 CACHE STRING "mingw-w64 target triple")
+ 
+ set(CMAKE_C_COMPILER   ${TOOLCHAIN_PREFIX}-gcc)
+ set(CMAKE_CXX_COMPILER ${TOOLCHAIN_PREFIX}-g++)
+-set(CMAKE_RC_COMPILER  ${TOOLCHAIN_PREFIX}-windres)
+-set(CMAKE_AR           ${TOOLCHAIN_PREFIX}-ar)
+-set(CMAKE_STRIP        ${TOOLCHAIN_PREFIX}-strip)
+ 
+ set(CMAKE_FIND_ROOT_PATH /usr/${TOOLCHAIN_PREFIX})
+ set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+@@ -25,6 +22,44 @@ set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+ set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+ set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
+ 
++# --- binutils ----------------------------------------------------------------
++# Distro cross toolchains (Debian's gcc-mingw-w64-i686 and friends) ship the
++# prefixed names, so this file used to hard-code i686-w64-mingw32-ar & co.
++# MSYS2's mingw-w64 packages do not: the unprefixed ar.exe / ranlib.exe /
++# windres.exe sit next to the prefixed gcc, and the prefixed binutils live one
++# level down in <bindir>/i686-w64-mingw32/bin. A bare prefixed name reached the
++# generated ninja archive rule verbatim, ninja runs that rule through cmd.exe,
++# and cmd.exe has no PATH entry for it -- the archive step died with
++# "'i686-w64-mingw32-ar' is not recognized as an internal or external command".
++# Resolve every tool to an absolute path instead, preferring the target binutils
++# directory when both spellings exist.
++#
++# NOTE: this must run after CMAKE_FIND_ROOT_PATH_MODE_PROGRAM is NEVER, or the
++# cross-compile find root would hide the host-side toolchain from find_program.
++find_program(TOOLCHAIN_GCC NAMES ${TOOLCHAIN_PREFIX}-gcc)
++if(NOT TOOLCHAIN_GCC)
++    message(FATAL_ERROR
++        "mingw-w64 gcc for ${TOOLCHAIN_PREFIX} not found on PATH. Install "
++        "mingw-w64-i686-gcc and run cmake from a shell that has it on PATH.")
++endif()
++get_filename_component(TOOLCHAIN_BINDIR "${TOOLCHAIN_GCC}" DIRECTORY)
++
++foreach(_tool ar ranlib strip windres)
++    find_program(TOOLCHAIN_${_tool}_EXE
++                 NAMES ${TOOLCHAIN_PREFIX}-${_tool} ${_tool}
++                 HINTS "${TOOLCHAIN_BINDIR}/${TOOLCHAIN_PREFIX}/bin"
++                       "${TOOLCHAIN_BINDIR}")
++    if(NOT TOOLCHAIN_${_tool}_EXE)
++        message(FATAL_ERROR
++            "mingw-w64 ${_tool} not found next to ${TOOLCHAIN_GCC}")
++    endif()
++endforeach()
++
++set(CMAKE_AR          "${TOOLCHAIN_ar_EXE}")
++set(CMAKE_RANLIB      "${TOOLCHAIN_ranlib_EXE}")
++set(CMAKE_STRIP       "${TOOLCHAIN_strip_EXE}")
++set(CMAKE_RC_COMPILER "${TOOLCHAIN_windres_EXE}")
++
+ # winpthreads backs std::thread/std::mutex under mingw; find_package(Threads)
+ # cannot run its try_compile probes meaningfully in a cross build, so seed the
+ # result the way soong's -lpthread does.

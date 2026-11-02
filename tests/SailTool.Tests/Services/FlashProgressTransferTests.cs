@@ -581,8 +581,8 @@ public class FlashProgressTransferTests
     [Fact]
     public void Capability_scan_recognises_the_shipped_progress_build()
     {
-        var path = Path.Combine(RepoRoot, "tools", "platform-tools", "fastboot.exe");
-        Assert.True(File.Exists(path), $"expected the shipped fastboot at {path}");
+        var path = Path.Combine(RepoRoot, "artifacts", "platform-tools", "fastboot.exe");
+        Assert.True(File.Exists(path), $"expected the source-built fastboot at {path}");
 
         Assert.True(FastbootCapability.SupportsTransferProgress(path));
     }

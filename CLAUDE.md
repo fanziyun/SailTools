@@ -7,7 +7,8 @@ several constraints below are non-obvious and were each found the hard way.
 
 SailTool (renamed from 363FastTool) is an unpackaged WinUI 3 desktop app for
 flashing Android devices over fastboot and adb. It shells out to
-`adb.exe` / `fastboot.exe` / `magiskboot.exe` from `tools/platform-tools`.
+`adb.exe` / `fastboot.exe` / `magiskboot.exe` that are compiled from source into
+`artifacts/platform-tools` — none of those binaries live in git.
 
 The UI is Chinese. That is the product's language and is not a translation gap.
 
@@ -20,8 +21,14 @@ SDK — building with it fails with NETSDK1045. The usable SDK 10.0.403 lives in
 ```bash
 "$USERPROFILE/.dotnet/dotnet.exe" build SailTool.sln
 "$USERPROFILE/.dotnet/dotnet.exe" test tests/SailTool.Tests/SailTool.Tests.csproj
+pwsh -File tools/platform-tools/build.ps1    # compile adb/fastboot/magiskboot from source
 pwsh -File installer/build-setup.ps1        # -> dist/SailTool-Setup-<version>-x64.exe
 ```
+
+The tool build needs MSYS2 with the mingw32 and clang64 toolchains; see
+`tools/platform-tools/README.md`. It is invoked automatically by the csproj
+target and by the packaging script, and returns immediately when the output
+stamp still matches `sources.json`.
 
 Inno Setup 6 is at `%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe`. Both tool
 paths are `-DotNetExe` / `-IsccExe` parameters on the packaging script.
@@ -42,19 +49,21 @@ handles distribution. `EnableMsixTooling` is on only so `Package.appxmanifest`
 keeps being validated, and that manifest's `Version` is the 4-part MSIX identity
 version — deliberately *not* the product version.
 
-**`tools/platform-tools` is the source of truth for the binaries**, and it is
-tracked in git. `SailTool.csproj` bridges it into the output with `None` items
-(`Link="platform-tools\..."`), not `Content` — Content items get picked up by the
-WinUI resource indexer and break the build. `PatchService` finds `magiskboot.exe`
-next to `fastboot.exe`, in `AppContext.BaseDirectory`, or in the `platform-tools`
-subfolder; `FastbootProcessService.FindToolInPlatformTools` looks beside the
-executable first and then on the user's Desktop (a dev convenience), returning
-null otherwise — it does not search PATH despite the comment numbering implying a
-third location.
+**`tools/platform-tools` is a build recipe, not a binary drop.** It holds
+`sources.json` (pinned upstream commits), `build.ps1`, and our patches; the
+compiled files go to `artifacts/platform-tools`. `SailTool.csproj` runs the
+script from a target before `AssignTargetPaths`, then bridges the output with
+`None` items (`Link="platform-tools\..."`), not `Content` — Content items get
+picked up by the WinUI resource indexer and break the build. `PatchService` finds
+`magiskboot.exe` next to `fastboot.exe`, in `AppContext.BaseDirectory`, or in the
+`platform-tools` subfolder; `FastbootProcessService.FindToolInPlatformTools`
+looks beside the executable first and then on the user's Desktop (a dev
+convenience), returning null otherwise — it does not search PATH despite the
+comment numbering implying a third location.
 
-Never copy these binaries into `bin/`. An earlier version of the packaging script
+Never commit the built binaries. An earlier version of the packaging script
 copied `platform-tools` from a gitignored Debug output tree, so `dotnet clean`
-destroyed the only copy.
+destroyed the only copy; the source build now reproduces them from scratch.
 
 **Installing over a running session fails with error 5.** Inno cannot delete
 `platform-tools\AdbWinApi.dll` while an `adb.exe` or `fastboot.exe` from the
@@ -63,16 +72,14 @@ those processes (`Get-Process adb,fastboot | Stop-Process -Force`) before
 reinstalling. Both have been hit in practice; a flashed device leaves a `fastboot`
 waiting on the USB endpoint long after the app is gone.
 
-**`fastboot.exe` is not Google's signed build.** It is our own build of AOSP
-fastboot 36.0.0 carrying MeowArch's progress bar, and it is unsigned; everything
-else in that directory is the signed Google Platform-Tools 37.0.1. It is not
-reproducible here without MSYS2's mingw-w64 i686 toolchain and an AOSP partial
-checkout — read `tools/platform-tools/PROVENANCE.md` before touching any of it.
-That file records the exact upstream commits, our two remaining source patches
-(the `FORCE_PROGRESS` pipe mode and the MSYS2 binutils fix — the 1 MiB send
-chunking that used to be ours now lives in upstream's own AOSP patch on
-`SendBuffer`), the verified behaviour matrix, and the GPL-3.0 obligation
-distribution creates.
+**`fastboot.exe` and `adb.exe` are unsigned source builds.** fastboot is AOSP
+fastboot 36.0.0 carrying MeowArch's progress bar; adb is AOSP 8.1's adb 1.0.40
+via prife/adb, the only adb host port that compiles under MSYS2 mingw32 without
+soong/libc++. Neither is reproducible here without MSYS2 (mingw32 and clang64), a
+BoringSSL 8.1 checkout, and the AOSP partial checkout — read
+`tools/platform-tools/PROVENANCE.md` before touching any of it. That file records
+the upstream commits, the patches, and the GPL-3.0 obligation distribution
+creates.
 
 The binary draws its bar only when stderr is a terminal, and this app always reads
 through a pipe, so both launch sites set `FORCE_PROGRESS=1` on the child
@@ -80,11 +87,11 @@ through a pipe, so both launch sites set `FORCE_PROGRESS=1` on the child
 latter's `cmd.exe` passes it down to every `fastboot flash` inside an OEM script).
 Without it a flash is silent and the percent bar never moves.
 
-Keep `AdbWinApi.dll` as the signed Google one. Our fastboot imports 12 functions
-from it (`AdbEnumInterfaces`, `AdbCreateInterfaceByName`, `AdbReadEndpointSync`, …)
-and the signed DLL exports all 12; both DLL versions export the same 79 functions
-at FileVersion 2.0.0.0. So exactly one file in the directory is unsigned, and
-swapping the vendor's unsigned DLL in would make it three.
+`AdbWinApi.dll` is compiled from the AOSP `development/host/windows/usb` sources
+as part of the tool build, not taken from Google's signed release. Our fastboot
+and adb import 12 functions from it (`AdbEnumInterfaces`,
+`AdbCreateInterfaceByName`, `AdbReadEndpointSync`, …) and the source build
+exports them; `AdbWinUsbApi.dll` is the WinUSB backend the API loads at runtime.
 
 **`<Version>` in `SailTool.csproj` is the single product version.** The packaging
 script parses it and passes it to ISCC as `/DMyAppVersion`. `InformationalVersion`
@@ -128,7 +135,8 @@ src/SailTool/           the app
   Helpers/              DialogHelper, FilePickerHelper, FileUtils, LogWriter
 tests/SailTool.Tests/   xUnit, mirrors the src layout
 installer/              Inno Setup script + packaging + bootstrap test scripts
-tools/platform-tools/   adb, fastboot, magiskboot, and the rest (tracked)
+tools/platform-tools/   source build recipe: sources.json, build.ps1, patches/
+artifacts/platform-tools/  compiled adb/fastboot/magiskboot (gitignored)
 ```
 
 The dependency chain inside `Services/` is fixed:

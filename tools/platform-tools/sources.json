@@ -1,0 +1,25 @@
+{
+  "adb": {
+    "repo": "https://github.com/prife/adb.git",
+    "commit": "bfb2c9ef3c7b5105f9a211bf22b4ac8733576087",
+    "version": "1.0.40",
+    "license": "Apache-2.0 (AOSP adb)"
+  },
+  "boringssl": {
+    "repo": "https://salsa.debian.org/android-tools-team/android-platform-external-boringssl.git",
+    "ref": "debian/8.1.0+r23-3",
+    "commit": "c924680461506b7f27c97d0d26cd92076ec47ed0",
+    "license": "ISC-style (BoringSSL authors)"
+  },
+  "fastboot": {
+    "repo": "https://github.com/MeowArch-open/MeowArchMobile_Android_Tools.git",
+    "commit": "952ca577cc9e71052d442c8315b975544daecb12",
+    "version": "36.0.0-meowarch-fastboot",
+    "license": "BSD-3-Clause (fastboot) + GPL-3.0 (MeowArch glue)"
+  },
+  "magiskboot": {
+    "repo": "https://github.com/svoboda18/android_tools.git",
+    "commit": "f9f56d0b75e8ef78a5ebd3108573e5986237dbfc",
+    "license": "GPL-3.0 (Magisk) + BSD-3-Clause (libnt)"
+  }
+}

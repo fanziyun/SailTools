@@ -43,9 +43,11 @@ boot 镜像一键修补、OEM 线刷包执行，全部走本机 `fastboot` / `ad
 安装程序会按需联网下载并安装缺少的前置：VC++ 运行库、.NET 10 桌面运行时、
 Windows App Runtime 2.5。离线环境需事先装好这三项。
 
-**外部工具** — `tools/platform-tools/` 已随仓库提供（Platform-Tools 37.0.1）：
-`adb.exe`、`fastboot.exe`、`magiskboot.exe` 及各自的运行库依赖。构建时自动复制到
-输出目录的 `platform-tools/` 子目录，运行时从那里加载，无需另行配置。
+**外部工具** — `tools/platform-tools/` 只有构建配方，不含预编译二进制。
+`tools/platform-tools/build.ps1` 会从固定上游源码编译 `adb.exe`、`fastboot.exe`、
+`magiskboot.exe` 与 `AdbWinApi.dll` / `AdbWinUsbApi.dll`，产物写入
+`artifacts/platform-tools/`；构建应用时自动复制到输出目录的 `platform-tools/`
+子目录，运行时从那里加载，无需另行配置。
 
 ## 构建与运行
 
@@ -79,16 +81,19 @@ dotnet 与 ISCC 路径都可用 `-DotNetExe` / `-IsccExe` 覆盖。
 ```
 src/SailTool/          应用源码
   Enums/  Models/  Services/  Services/Parsing/  ViewModels/  Pages/  Helpers/
-tests/SailTool.Tests/  xUnit 测试（304 个）
+tests/SailTool.Tests/  xUnit 测试（314 个）
 installer/             Inno Setup 脚本与打包/测试脚本
-tools/platform-tools/  adb / fastboot / magiskboot（随仓库提供）
+tools/platform-tools/  源码构建配方：sources.json / build.ps1 / patches/
+artifacts/platform-tools/  编译出的 adb / fastboot / magiskboot（不纳入版本控制）
 artifacts/  dist/      构建与打包产物，不纳入版本控制
 ```
 
 ## 第三方组件
 
-`tools/platform-tools/` 下是 Google Android SDK Platform-Tools 37.0.1 的发行内容，
-其中 `magiskboot.exe` 来自 Magisk。授权文本随发行包提供，见
-[`tools/platform-tools/NOTICE.txt`](tools/platform-tools/NOTICE.txt)。
+外部工具全部在构建时从源码编译：`adb.exe` 来自 prife/adb（AOSP adb 1.0.40）
+与 BoringSSL 8.1，`fastboot.exe` 来自 MeowArchMobile_Android_Tools（AOSP
+fastboot + MeowArch 胶水层），`magiskboot.exe` 来自 svoboda18/android_tools
+（Magisk 原生源码）。固定提交、补丁与授权说明见
+[`tools/platform-tools/PROVENANCE.md`](tools/platform-tools/PROVENANCE.md)。
 
 本仓库自身未附带许可证文件。

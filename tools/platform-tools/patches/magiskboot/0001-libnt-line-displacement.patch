@@ -1,0 +1,18 @@
+diff --git a/libnt.c b/libnt.c
+index 8439e27..e928892 100644
+--- a/libnt.c
++++ b/libnt.c
+@@ -174,10 +174,11 @@ skip_init:
+ 
+     symbolLine.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
+ 
+-    if (SymGetLineFromAddr64(process, (DWORD64)addr, &dldisp, &symbolLine)) {
++    DWORD line_disp = 0;
++    if (SymGetLineFromAddr64(process, (DWORD64)addr, &line_disp, &symbolLine)) {
+         info->dli_sfname = strdup(symbolLine.FileName);
+         info->dli_sfline = symbolLine.LineNumber;
+-        info->dli_sfaddr = (char*)addr - dldisp;
++        info->dli_sfaddr = (char*)addr - line_disp;
+     }
+ 
+     pthread_spin_unlock(&dladdr_slk);

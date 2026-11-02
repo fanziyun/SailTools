@@ -1,0 +1,126 @@
+diff --git a/better_fastboot/src/fb_progress.cpp b/better_fastboot/src/fb_progress.cpp
+index e440818..454289f 100644
+--- a/better_fastboot/src/fb_progress.cpp
++++ b/better_fastboot/src/fb_progress.cpp
+@@ -36,6 +36,7 @@ namespace fbprogress {
+ namespace {
+ 
+ bool g_enabled = false;   // bar rendering on (tty && !NO_PROGRESS)
++bool g_pipe = false;      // FORCE_PROGRESS: a machine consumer, not a terminal
+ bool g_armed = false;     // a command is in progress (Arm() called)
+ bool g_bar_active = false; // the bar line is currently drawn on screen
+ bool g_hidden = false;    // temporarily hidden for an interleaved message
+@@ -88,6 +89,21 @@ bool StderrIsTerminal() {
+ bool Detect() {
+     const char* np = getenv("NO_PROGRESS");
+     if (np && np[0] != '\0') return false;
++
++    // SailTool patch: FORCE_PROGRESS overrides the tty requirement, mirroring
++    // FORCE_COLOR. The bar is a deliberate no-op on a non-tty so scripted
++    // consumers keep byte-identical upstream output, but that leaves callers
++    // that read stderr through a pipe (GUI wrappers, log capture) with no
++    // progress at all. NO_PROGRESS is checked first and still wins: it is the
++    // explicit opt-out.
++    const char* force = getenv("FORCE_PROGRESS");
++    if (force && force[0] != '\0' && force[0] != '0') {
++        // A pipe consumer samples the stream on its own clock and wants frames
++        // finer than its sampling interval; see Update() and Draw().
++        g_pipe = true;
++        return true;
++    }
++
+     if (!StderrIsTerminal()) return false;
+     const char* term = getenv("TERM");
+     // Windows terminals do not export TERM; only an explicit "dumb" opts out
+@@ -236,7 +252,12 @@ void Draw(uint64_t current, uint64_t total) {
+     while (!prolog.empty() && prolog.back() == ' ') prolog.pop_back();
+     size_t prolog_w = DisplayWidth(prolog);
+ 
+-    const int cols = g_cols > 0 ? g_cols : 80;
++    // SailTool: a pipe consumer has no terminal width to fit, and the narrow
++    // degradation ladder below would drop the byte counters the app parses.
++    // Give it a generous virtual width so every field survives; the bar itself
++    // is still capped by kMaxBar. A real terminal (FORCE_PROGRESS set by hand
++    // in a console) keeps its measured width.
++    const int cols = g_pipe ? (g_cols > 0 ? g_cols : 160) : (g_cols > 0 ? g_cols : 80);
+     const int kMinBar = 12, kMaxBar = 28;
+ 
+     // Field widths are budgeted, not measured per frame: the speed text
+@@ -310,7 +331,11 @@ void Draw(uint64_t current, uint64_t total) {
+     // together, so there the bar only appears once the line is complete: a
+     // single self-contained line, which the epilog then rewrites exactly.
+     if (!fbcolor::EscapesOk()) {
+-        if (current < total) return;
++        // SailTool: FORCE_PROGRESS means a pipe consumer wants every frame,
++        // not only the completed line this non-VT fallback was designed for.
++        // The plain frame below already carries \r separators, which the app
++        // splits on; no escape sequence is written.
++        if (!g_pipe && current < total) return;
+         // "\r" is a carriage return, not an escape: it still works on a
+         // console without VT processing, so the padded prolog Status()
+         // already printed is overwritten rather than duplicated.
+@@ -324,7 +349,9 @@ void Draw(uint64_t current, uint64_t total) {
+         fflush(stderr);
+         g_shown = prolog;
+         g_shown_valid = true;
+-        g_bar_active = false;
++        // SailTool: on a pipe the frame stays "active" so Update()'s 25 ms /
++        // total/2000 throttle applies instead of one frame per 1 MiB chunk.
++        g_bar_active = g_pipe;
+         return;
+     }
+ 
+@@ -392,16 +419,23 @@ void Update(uint64_t current, uint64_t total) {
+     // Throttle: skip cheaply unless we advanced enough to matter.
+     if (g_bar_active && current - g_last_draw_bytes < g_granularity) return;
+ 
++    // SailTool: a pipe consumer renders on its own 100 ms clock, so the frames
++    // it samples must arrive well inside that window or the display beats
++    // between two nearly equal periods (80 ms frames read at 100 ms come out
++    // 80/160 ms apart). Terminals keep the gentler cadence.
++    const double kDrawInterval = g_pipe ? 0.025 : 0.08;
++    const uint64_t kMinGranularity = g_pipe ? 16384u : 65536u;
++
+     double t = Now();
+     // Throttle by time as well (the sparse path calls per 1 KiB chunk).
+-    if (g_bar_active && (t - g_last_draw_t) < 0.08 && current < total) return;
++    if (g_bar_active && (t - g_last_draw_t) < kDrawInterval && current < total) return;
+ 
+     g_samples[g_sample_head].t = t;
+     g_samples[g_sample_head].bytes = current;
+     g_sample_head = (g_sample_head + 1) % 8;
+     if (g_sample_count < 8) g_sample_count++;
+ 
+-    g_granularity = std::max<uint64_t>(total / 400, 65536);
++    g_granularity = std::max<uint64_t>(total / (g_pipe ? 2000 : 400), kMinGranularity);
+     g_cols = TermCols();
+     Draw(current, total);
+     g_last_draw_t = t;
+@@ -414,7 +448,10 @@ void Finish() {
+         g_bar_active = false;
+         return;
+     }
+-    if (g_bar_active && !g_hidden) {
++    // SailTool: the pipe frame ends with "\n" and there is nothing on screen to
++    // erase, so the tty-only prolog rewrite below must not run: it would emit
++    // a bare, unterminated prolog line into the log stream.
++    if (g_bar_active && !g_hidden && !g_pipe) {
+         // Leave the line exactly as upstream would have: \r, the padded prolog,
+         // then erase the bar region. The erase deliberately does not depend on
+         // colours being enabled (NO_COLOR + tty used to leave the bar's tail
+diff --git a/better_fastboot/src/fb_progress.h b/better_fastboot/src/fb_progress.h
+index bddfa15..e5f0722 100644
+--- a/better_fastboot/src/fb_progress.h
++++ b/better_fastboot/src/fb_progress.h
+@@ -15,6 +15,11 @@
+  *
+  * When stderr is not a tty (pipe, CI log, file) every function is a no-op, so
+  * output stays byte-identical to upstream fastboot.
++ *
++ * SailTool patch: setting FORCE_PROGRESS=1 overrides only the tty requirement,
++ * so a caller reading stderr through a pipe still gets the bar as plain,
++ * \r-separated text (colours stay off — they have their own detection).
++ * NO_PROGRESS=1 still wins over it.
+  */
+ #pragma once
+ 

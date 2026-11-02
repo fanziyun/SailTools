@@ -35,9 +35,17 @@ $appVersion = $csproj.Project.PropertyGroup.Version | Where-Object { $_ } | Sele
 if (-not $appVersion) { throw "No <Version> found in $project" }
 Write-Host "Version: $appVersion"
 
+# 1b) The external tools are compiled from source into artifacts/platform-tools
+#     by tools/platform-tools/build.ps1. Run it explicitly here so a packaging
+#     run never ships a stale or missing toolset; the script is fast when its
+#     stamp is current.
+& pwsh -NoProfile -ExecutionPolicy Bypass `
+    -File (Join-Path $root 'tools\platform-tools\build.ps1')
+if ($LASTEXITCODE -ne 0) { throw "platform-tools build failed" }
+
 # 2) Framework-dependent publish (.NET and Windows App SDK both external).
-#    tools/platform-tools flows into the output on its own via the csproj item
-#    group, so there is nothing to copy in afterwards.
+#    platform-tools flows into the output via the csproj target/item group, so
+#    there is nothing to copy in afterwards.
 if (Test-Path $payload) { Remove-Item $payload -Recurse -Force }
 & $DotNetExe publish $project -c Release -r win-x64 `
     -p:Platform=x64 -p:SelfContained=false -p:WindowsAppSDKSelfContained=false `
