@@ -43,6 +43,33 @@ public class FastbootBarProgressTests
         "Finished. Total time: 1.475s",
     ];
 
+    /// <summary>
+    /// The same kind of transfer captured from the current build (MeowArch's
+    /// single-line bar, upstream 952ca57). The frame shape changed: the prolog is
+    /// trimmed to one separating space instead of being padded to 50 columns, the
+    /// bar width is budgeted from the terminal width, and every frame now ends
+    /// with a newline because the pipe path cannot erase the line with <c>\033[K</c>.
+    /// </summary>
+    /// <remarks>
+    /// Captured with <c>FORCE_PROGRESS=1</c>, stderr redirected to a file (the same
+    /// non-tty path the app reads). The old padded frames above are kept: a build
+    /// that still pads must parse too, and the pattern is deliberately indifferent
+    /// to the spacing between prolog and bar.
+    /// </remarks>
+    private static readonly string[] BootFlashCurrent =
+    [
+        "Warning: skip copying boot image avb footer (boot partition size: 0, boot image size: 19922944).",
+        "Sending 'boot' (19456 KB)",
+        "Sending 'boot' (19456 KB) [#>--------------------------]    5%  1.0 MiB/19.0 MiB",
+        "Sending 'boot' (19456 KB) [####>-----------------------]   16%  3.0 MiB/19.0 MiB 29.8 MiB/s ETA 0:01",
+        "Sending 'boot' (19456 KB) [############>---------------]   42%  8.0 MiB/19.0 MiB 17.5 MiB/s ETA 0:01",
+        "Sending 'boot' (19456 KB) [###########################>]   95%  18.0 MiB/19.0 MiB 15.0 MiB/s ETA 0:00",
+        "Sending 'boot' (19456 KB) [############################]  100%  19.0 MiB/19.0 MiB 15.0 MiB/s",
+        "OKAY [  1.267s]",
+        "Writing 'boot'                                     OKAY [  0.200s]",
+        "Finished. Total time: 1.470s",
+    ];
+
     private static FlashProgressTracker CreateTracker(List<FlashProgressInfo> sink)
         => new(info => sink.Add(info));
 
@@ -179,6 +206,65 @@ public class FastbootBarProgressTests
         var percents = progress.Select(p => p.Percent).Distinct().ToList();
         foreach (var expected in new[] { 5, 21, 31, 42, 52, 63, 73, 84, 94, 100 })
             Assert.Contains(expected, percents);
+    }
+
+    [Fact]
+    public void The_current_build_frame_shape_yields_all_four_numbers()
+    {
+        var progress = new List<FlashProgressInfo>();
+        var tracker = CreateTracker(progress);
+
+        tracker.HandleLine(BootFlashCurrent[3]);
+
+        var info = Assert.Single(progress);
+        Assert.Equal(16, info.Percent);
+        Assert.Equal(29.8, info.SpeedMBs!.Value, 2);
+        Assert.Equal((long)(3.0 * 1024 * 1024), info.TransferredBytes);
+        Assert.Equal((long)(19.0 * 1024 * 1024), info.TotalBytes);
+        Assert.Equal(FlashPhase.Sending, info.Phase);
+    }
+
+    [Fact]
+    public void The_current_build_recorded_transfer_is_monotonic_and_ends_finished()
+    {
+        var progress = new List<FlashProgressInfo>();
+        var tracker = CreateTracker(progress);
+
+        foreach (var line in BootFlashCurrent) tracker.HandleLine(line);
+
+        Assert.True(tracker.SawIntermediateProgress);
+        for (var i = 1; i < progress.Count; i++)
+            Assert.True(progress[i].Percent >= progress[i - 1].Percent,
+                $"percent regressed at {i}: {progress[i - 1].Percent} -> {progress[i].Percent}");
+
+        var percents = progress.Select(p => p.Percent).Distinct().ToList();
+        foreach (var expected in new[] { 5, 16, 42, 95, 100 })
+            Assert.Contains(expected, percents);
+
+        Assert.Equal(100, progress[^1].Percent);
+        Assert.Equal(FlashPhase.Finished, progress[^1].Phase);
+    }
+
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(5)]
+    [InlineData(6)]
+    public void Current_build_bar_frames_are_progress_lines(int index)
+    {
+        Assert.True(FastbootOutputParser.IsProgressLine(BootFlashCurrent[index]));
+    }
+
+    [Fact]
+    public void A_current_build_frame_still_strips_to_the_sampled_shape()
+    {
+        var stripped = FastbootOutputParser.RemoveProgressBar(BootFlashCurrent[3]);
+
+        Assert.DoesNotContain("[", stripped);
+        Assert.Contains("16%", stripped);
+        Assert.Contains("3.0 MiB/19.0 MiB", stripped);
+        Assert.True(FastbootOutputParser.IsProgressLine(stripped));
     }
 
     // ══════════════════════════════════════════════════════════════

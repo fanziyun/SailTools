@@ -163,7 +163,7 @@ internal sealed class FlashProgressTracker
 
         // ── 1b. Bar frame (MeowArch build with FORCE_PROGRESS=1) ──────────
         //
-        // "Sending 'boot' (19531 KB)  [####>---]  45%  8.0 MiB/19.1 MiB 17.5 MiB/s"
+        // "Sending 'boot' (19456 KB) [####>---]  45%  8.0 MiB/19.0 MiB 17.5 MiB/s"
         //
         // Same numbers as the transfer line above, so it goes through the same
         // handler: the group names were kept identical on purpose.

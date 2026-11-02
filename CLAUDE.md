@@ -68,9 +68,10 @@ fastboot 36.0.0 carrying MeowArch's progress bar, and it is unsigned; everything
 else in that directory is the signed Google Platform-Tools 37.0.1. It is not
 reproducible here without MSYS2's mingw-w64 i686 toolchain and an AOSP partial
 checkout — read `tools/platform-tools/PROVENANCE.md` before touching any of it.
-That file records the exact upstream commits, our four source patches (the
-`FORCE_PROGRESS` switch, the MSYS2 binutils fix, the 1 MiB sparse chunking and the
-denser pipe cadence), the verified behaviour matrix, and the GPL-3.0 obligation
+That file records the exact upstream commits, our two remaining source patches
+(the `FORCE_PROGRESS` pipe mode and the MSYS2 binutils fix — the 1 MiB send
+chunking that used to be ours now lives in upstream's own AOSP patch on
+`SendBuffer`), the verified behaviour matrix, and the GPL-3.0 obligation
 distribution creates.
 
 The binary draws its bar only when stderr is a terminal, and this app always reads
@@ -223,15 +224,22 @@ The 100 ms figure and the "drop unchanged state" rule are a product decision fro
 the owner, not a tuned constant — do not retune them without asking. It was 300 ms
 until 2026-11-01; at that spacing a 40 MiB/s transfer visibly stepped.
 
-Two of our patches to fastboot exist for that 100 ms window, and removing either
-brings the stutter back. `SparseWriteCallback` sends a sparse download in 1 MiB
-pieces instead of one `SendBuffer` per sparse span — a span runs to tens of MiB and
-the progress callback hangs off `SendBuffer`, so the bar stood still for a second
-and then jumped. And with `FORCE_PROGRESS=1` the bar's own cadence drops from
-80 ms/`total÷400` to 25 ms/`total÷2000`, because an 80 ms source sampled at 100 ms
-beats into uneven 80/160 ms gaps — two clocks that are nearly, but not exactly,
-in step. Measured with the TCP mock at 15 MB/s: 67 ms gaps on both paths, 97 frames
-for a 100 MiB sparse flash that used to emit 8.
+Two pieces of fastboot's own behaviour exist for that 100 ms window, and removing
+either brings the stutter back. Upstream's AOSP patch chunks every transport
+write at 1 MiB in `SendBuffer(const void*, size_t)` instead of one `SendBuffer`
+per sparse span — a span runs to tens of MiB and the progress callback hangs off
+`SendBuffer`, so the bar stood still for a second and then jumped. (That chunking
+used to be our patch on `SparseWriteCallback`; upstream commit `7068b29` moved it
+to the shared write path, which covers every caller, so we no longer carry it.)
+And with `FORCE_PROGRESS=1` the bar's cadence drops from 80 ms/`total÷400` to
+25 ms/`total÷2000`, because an 80 ms source sampled at 100 ms beats into uneven
+80/160 ms gaps — two clocks that are nearly, but not exactly, in step. Measured
+with the TCP mock at 15 MB/s: 67 ms gaps on both paths, 97 frames for a 100 MiB
+sparse flash that used to emit 8.
+
+The current bar frame trims the prolog to a single separating space (the previous
+build padded it to 50 columns wide) and ends each frame with a newline on the pipe
+path; the parser matches on the capture groups, not the spacing.
 
 `ROMFlashPageViewModel.ExecuteBatAsync` reuses `ReadStreamLinesAsync` and
 `ProgressLogGate` but not the tracker. It injects `platform-tools` into the child

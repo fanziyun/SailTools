@@ -26,6 +26,14 @@ public class LogBufferTests
         "Sending 'boot' (19531 KB)                           [########################] 100%  19.1 MiB/19.1 MiB 14.0 MiB/s",
     ];
 
+    /// <summary>
+    /// A frame from the current build (upstream 952ca57), captured the same way.
+    /// The prolog is trimmed to one space and the frame is newline-terminated; the
+    /// overwrite rule must not depend on the old 50-column padding.
+    /// </summary>
+    private const string CurrentBarFrame =
+        "Sending 'boot' (19456 KB) [############>---------------]   42%  8.0 MiB/19.0 MiB 17.5 MiB/s ETA 0:01";
+
     // ══════════════════════════════════════════════════════════════
     //  append
     // ══════════════════════════════════════════════════════════════
@@ -94,6 +102,22 @@ public class LogBufferTests
     public void LastLineIsProgress_recognises_every_bar_frame(int index)
     {
         Assert.True(LogBuffer.LastLineIsProgress(BarFrames[index] + "\n"));
+    }
+
+    [Fact]
+    public void LastLineIsProgress_recognises_a_current_build_frame()
+    {
+        Assert.True(LogBuffer.LastLineIsProgress(CurrentBarFrame + "\n"));
+    }
+
+    [Fact]
+    public void A_current_build_frame_overwrites_the_previous_one_in_place()
+    {
+        var text = LogBuffer.ReplaceLastLine("", BarFrames[0]);
+        text = LogBuffer.ReplaceLastLine(text, CurrentBarFrame);
+
+        Assert.Equal(CurrentBarFrame + "\n", text);
+        Assert.Single(text.TrimEnd('\n').Split('\n'));
     }
 
     [Fact]

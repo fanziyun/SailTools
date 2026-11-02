@@ -151,8 +151,8 @@ internal static partial class FastbootOutputParser
     /// and captures the same four numbers as <see cref="TransferProgressRegex"/> so
     /// both shapes feed the tracker through one code path:
     /// <code>
-    ///   Sending 'boot' (19531 KB)        [#&gt;----------------------]   5%  1.0 MiB/19.1 MiB
-    ///   Sending 'boot' (19531 KB)        [#######################&gt;]  94%  18.0 MiB/19.1 MiB 15.0 MiB/s ETA 0:00
+    ///   Sending 'boot' (19456 KB) [#&gt;--------------------------]    5%  1.0 MiB/19.0 MiB
+    ///   Sending 'boot' (19456 KB) [###########################&gt;]   95%  18.0 MiB/19.0 MiB 15.0 MiB/s ETA 0:00
     /// </code>
     /// </summary>
     /// <remarks>
@@ -161,7 +161,9 @@ internal static partial class FastbootOutputParser
     /// reader has split on both CR and LF. Every frame repeats the prolog it was
     /// armed with — in practice the <c>Sending 'name' (N KB)</c> header — which is why
     /// this pattern is not anchored at the start of the line: the prolog is part of
-    /// the frame, not a separate line.
+    /// the frame, not a separate line. The spacing between prolog and bar is not
+    /// significant: the current build trims the prolog to one space, while the
+    /// previous one padded it to 50 columns.
     /// </para>
     /// <para>
     /// The speed and eta fields are both optional because the format suppresses them
@@ -231,8 +233,8 @@ internal static partial class FastbootOutputParser
     /// <summary>
     /// Strips the bar graphic from a frame, keeping the numbers:
     /// <code>
-    ///   Sending 'boot' (19531 KB)   [####&gt;---]  45%  8.0 MiB/19.1 MiB 17.5 MiB/s
-    /// → Sending 'boot' (19531 KB)  45%  8.0 MiB/19.1 MiB 17.5 MiB/s
+    ///   Sending 'boot' (19456 KB) [####&gt;---]  45%  8.0 MiB/19.0 MiB 17.5 MiB/s
+    /// → Sending 'boot' (19456 KB)   45%  8.0 MiB/19.0 MiB 17.5 MiB/s
     /// </code>
     /// </summary>
     /// <remarks>

@@ -152,7 +152,7 @@ internal sealed class ProgressLogGate
                 g["speed"].Value, g["speedUnit"].Value);
         }
 
-        // Bar frame: "Sending 'boot' (19531 KB)  [##>-]  45%  8.0 MiB/19.1 MiB 17.5 MiB/s".
+        // Bar frame: "Sending 'boot' (19456 KB) [##>-]  45%  8.0 MiB/19.0 MiB 17.5 MiB/s".
         // Checked before the Sparse header below, because the frame repeats that
         // prolog too.
         var bar = FastbootOutputParser.BarProgressRegex().Match(line);
