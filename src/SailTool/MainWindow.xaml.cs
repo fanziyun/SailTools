@@ -1,3 +1,4 @@
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
@@ -29,7 +30,21 @@ public sealed partial class MainWindow : Window
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
         AppWindow.SetIcon("Assets/AppIcon.ico");
-        AppWindow.Resize(new Windows.Graphics.SizeInt32(1100, 750));
+
+        const int FixedWidth = 1552;
+        const int FixedHeight = 1063;
+
+        if (AppWindow.Presenter is OverlappedPresenter presenter)
+        {
+            presenter.IsResizable = false;
+            presenter.IsMaximizable = false;
+        }
+
+        var workArea = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary)?.WorkArea
+                       ?? new Windows.Graphics.RectInt32(0, 0, FixedWidth, FixedHeight);
+        var x = Math.Max(workArea.X, workArea.X + (workArea.Width - FixedWidth) / 2);
+        var y = Math.Max(workArea.Y, workArea.Y + (workArea.Height - FixedHeight) / 2);
+        AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(x, y, FixedWidth, FixedHeight));
 
         // Drain the queue every time the Frame finishes a navigation
         ContentFrame.Navigated += OnContentFrameNavigated;
